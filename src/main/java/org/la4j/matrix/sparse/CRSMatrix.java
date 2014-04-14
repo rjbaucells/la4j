@@ -19,6 +19,7 @@
  *                 Maxim Samoylov
  *                 Anveshi Charuvaka
  *                 Clement Skau
+ *                 Catherine da Graca
  * 
  */
 
@@ -59,8 +60,12 @@ public class CRSMatrix extends AbstractCompressedMatrix implements SparseMatrix 
         this(rows, columns, 0);
     }
 
+    public CRSMatrix(int rows, int columns, double array[]) {
+        this(Matrices.asArray1DSource(rows, columns, array));
+    }
+
     public CRSMatrix(Matrix matrix) {
-        this(Matrices.asUnsafeSource(matrix));
+        this(Matrices.asMatrixSource(matrix));
     }
 
     public CRSMatrix(double array[][]) {
@@ -115,7 +120,7 @@ public class CRSMatrix extends AbstractCompressedMatrix implements SparseMatrix 
     }
 
     @Override
-    public double get(int i, int j) {
+    public double getOrElse(int i, int j, double defaultValue) {
 
         int k = searchForColumnIndex(j, rowPointers[i], rowPointers[i + 1]);
 
@@ -123,7 +128,7 @@ public class CRSMatrix extends AbstractCompressedMatrix implements SparseMatrix 
             return values[k];
         }
 
-        return 0.0;
+        return defaultValue;
     }
 
     @Override
@@ -307,8 +312,9 @@ public class CRSMatrix extends AbstractCompressedMatrix implements SparseMatrix 
     public void each(MatrixProcedure procedure) {
         int k = 0;
         for (int i = 0; i < rows; i++) {
+            int valuesSoFar = rowPointers[i + 1];
             for (int j = 0; j < columns; j++) {
-                if (j == columnIndices[k]) {
+                if (k < valuesSoFar && j == columnIndices[k]) {
                     procedure.apply(i, j, values[k++]);
                 } else {
                     procedure.apply(i, j, 0.0);
@@ -320,8 +326,9 @@ public class CRSMatrix extends AbstractCompressedMatrix implements SparseMatrix 
     @Override
     public void eachInRow(int i, MatrixProcedure procedure) {
         int k = rowPointers[i];
+        int valuesSoFar = rowPointers[i + 1];
         for (int j = 0; j < columns; j++) {
-            if (j == columnIndices[k]) {
+            if (k < valuesSoFar && j == columnIndices[k]) {
                 procedure.apply(i, j, values[k++]);
             } else {
                 procedure.apply(i, j, 0.0);
@@ -363,14 +370,15 @@ public class CRSMatrix extends AbstractCompressedMatrix implements SparseMatrix 
         out.writeInt(columns);
         out.writeInt(cardinality);
 
-        int k = 0, i = 0;
-        while (k < cardinality) {
-            for (int j = rowPointers[i]; j < rowPointers[i + 1]; j++, k++) {
-                out.writeInt(i);
-                out.writeInt(columnIndices[j]);
-                out.writeDouble(values[j]);
-            }
-            i++;
+        // write pairs (value, column index)
+        for (int i = 0; i < cardinality; i++) {
+            out.writeDouble(values[i]);
+            out.writeInt(columnIndices[i]);
+        }
+
+        // write row pointers
+        for (int i = 0; i < rows + 1; i++) {
+            out.writeInt(rowPointers[i]);
         }
     }
 
@@ -388,39 +396,38 @@ public class CRSMatrix extends AbstractCompressedMatrix implements SparseMatrix 
         columnIndices = new int[alignedSize];
         rowPointers = new int[rows + 1];
 
-        for (int k = 0; k < cardinality; k++) {
-            int i = in.readInt();
-            columnIndices[k] = in.readInt();
-            values[k] = in.readDouble();
-            rowPointers[i + 1] = k + 1;
+        // read pairs (value, column index)
+        for (int i = 0; i < cardinality; i++) {
+            values[i] = in.readDouble();
+            columnIndices[i] = in.readInt();
         }
+
+        // read row pointers
+        for (int i = 0; i < rows + 1; i++) {
+            rowPointers[i] = in.readInt();
+        }
+    }
+
+    @Override
+    public boolean nonZeroAt(int i, int j) {
+        int k = searchForColumnIndex(j, rowPointers[i], rowPointers[i + 1]);
+        return k < rowPointers[i + 1] && columnIndices[k] == j;
     }
 
     private int searchForColumnIndex(int j, int left, int right) {
 
-        if (left == right) {
-            return left;
-        }
-
-        if (right - left < 8) {
-
-            int jj = left;
-            while (jj < right && columnIndices[jj] < j) {
-                jj++;
+        while (left < right) {
+            int p = (left + right) / 2;
+            if (columnIndices[p] > j) {
+                right = p;
+            } else if (columnIndices[p] < j) {
+                left = p + 1;
+            } else {
+                return p;
             }
-
-            return jj;
         }
 
-        int p = (left + right) / 2;
-
-        if (columnIndices[p] > j) {
-            return searchForColumnIndex(j, left, p);
-        } else if (columnIndices[p] < j) {
-            return searchForColumnIndex(j, p + 1, right);
-        } else {
-            return p;
-        }
+        return left;
     }
 
     private void insert(int k, int i, int j, double value) {
@@ -567,10 +574,6 @@ public class CRSMatrix extends AbstractCompressedMatrix implements SparseMatrix 
             fail("No rows or columns selected.");
         }
 
-        // Test all rowIndices and columnIndices are within bounds
-        checkIndexBounds(rowIndices, rows);
-        checkIndexBounds(columnIndices, columns);
-
         // determine number of non-zero values (cardinality)
         // before allocating space, this is perhaps more efficient
         // than single pass and calling grow() when required.
@@ -607,5 +610,4 @@ public class CRSMatrix extends AbstractCompressedMatrix implements SparseMatrix 
         return new CRSMatrix(newRows, newCols, newCardinality, newValues,
                              newColumnIndices, newRowPointers);
     }
-    
 }

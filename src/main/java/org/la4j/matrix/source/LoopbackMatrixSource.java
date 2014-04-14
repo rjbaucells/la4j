@@ -19,26 +19,30 @@
  * 
  */
 
-package org.la4j.vector.sparse;
+package org.la4j.matrix.source;
 
-import org.la4j.vector.AbstractSafeVector;
+import org.la4j.matrix.Matrix;
 
-public class SparseSafeVector extends AbstractSafeVector implements SparseVector {
+public class LoopbackMatrixSource implements MatrixSource {
 
-    private SparseVector sparse;
+    private Matrix matrix;
 
-    public SparseSafeVector(SparseVector vector) {
-        super(vector);
-        this.sparse = vector;
+    public LoopbackMatrixSource(Matrix matrix) {
+        this.matrix = matrix;
     }
 
     @Override
-    public int cardinality() {
-        return sparse.cardinality();
+    public double get(int i, int j) {
+        return matrix.get(i, j);
     }
 
     @Override
-    public double density() {
-        return sparse.density();
+    public int columns() {
+        return matrix.columns();
+    }
+
+    @Override
+    public int rows() {
+        return matrix.rows();
     }
 }

@@ -23,11 +23,11 @@ package org.la4j.vector.source;
 
 import org.la4j.vector.Vector;
 
-public class UnsafeVectorSource implements VectorSource {
+public class LoopbackVectorSource implements VectorSource {
 
     private Vector vector;
 
-    public UnsafeVectorSource(Vector vector) {
+    public LoopbackVectorSource(Vector vector) {
         this.vector = vector;
     }
 

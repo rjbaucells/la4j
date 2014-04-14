@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013, by Vladimir Kostyukov and Contributors.
+ * Copyright 2011-2014, by Vladimir Kostyukov and Contributors.
  * 
  * This file is part of la4j project (http://la4j.org)
  * 
@@ -19,32 +19,36 @@
  *                 Ewald Grusk
  *                 Maxim Samoylov
  *                 Miron Aseev
- * 
+ *                 Todd Brunhoff
+ *
  */
 
 package org.la4j.matrix;
 
 import org.la4j.LinearAlgebra;
+import org.la4j.factory.Factory;
 import org.la4j.io.MatrixMarketStream;
 import org.la4j.io.SymbolSeparatedStream;
+import org.la4j.matrix.builder.TerminalMatrixBuilder;
+import org.la4j.matrix.builder.MatrixBuilder;
 import org.la4j.matrix.functor.AdvancedMatrixPredicate;
 import org.la4j.matrix.functor.MatrixAccumulator;
 import org.la4j.matrix.functor.MatrixFunction;
 import org.la4j.matrix.functor.MatrixPredicate;
+import org.la4j.matrix.functor.MatrixProcedure;
 import org.la4j.matrix.source.Array1DMatrixSource;
 import org.la4j.matrix.source.Array2DMatrixSource;
 import org.la4j.matrix.source.IdentityMatrixSource;
+import org.la4j.matrix.source.LoopbackMatrixSource;
 import org.la4j.matrix.source.MatrixSource;
 import org.la4j.matrix.source.RandomMatrixSource;
 import org.la4j.matrix.source.RandomSymmetricMatrixSource;
-import org.la4j.matrix.source.SafeMatrixSource;
 import org.la4j.matrix.source.StreamMatrixSource;
-import org.la4j.matrix.source.UnsafeMatrixSource;
-import org.la4j.vector.Vector;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Random;
 
 public final class Matrices {
 
@@ -58,7 +62,12 @@ public final class Matrices {
      */
     public static final int ROUND_FACTOR = LinearAlgebra.ROUND_FACTOR;
 
-    private static class DiagonalMatrixPredicate implements MatrixPredicate {
+    /**
+     * Checks whether the matrix is a
+     * <a href="http://mathworld.wolfram.com/DiagonalMatrix.html">diagonal
+     * matrix</a>.
+     */
+    public static final MatrixPredicate DIAGONAL_MATRIX = new MatrixPredicate() {
         @Override
         public boolean test(int rows, int columns) {
             return rows == columns;
@@ -68,9 +77,14 @@ public final class Matrices {
         public boolean test(int i, int j, double value) {
             return (i == j) || Math.abs(value) < EPS;
         }
-    }
+    };
 
-    private static class IdentityMatrixPredicate implements MatrixPredicate {
+    /**
+     * Checks whether the matrix is an
+     * <a href="http://mathworld.wolfram.com/IdentityMatrix.html">identity
+     * matrix</a>.
+     */
+    public static final MatrixPredicate IDENTITY_MATRIX = new MatrixPredicate() {
         @Override
         public boolean test(int rows, int columns) {
             return rows == columns;
@@ -78,12 +92,17 @@ public final class Matrices {
 
         @Override
         public boolean test(int i, int j, double value) {
-            return (i == j) ? Math.abs(1.0 - value) < EPS 
-                            : Math.abs(value) < EPS; 
+            return (i == j) ? Math.abs(1.0 - value) < EPS
+                    : Math.abs(value) < EPS;
         }
-    }
+    };
 
-    private static class ZeroMatrixPredicate implements MatrixPredicate {
+    /**
+     * Checks whether the matrix is a
+     * <a href="http://mathworld.wolfram.com/ZeroMatrix.html">zero
+     * matrix</a>.
+     */
+    public static final MatrixPredicate ZERO_MATRIX = new MatrixPredicate() {
         @Override
         public boolean test(int rows, int columns) {
             return true;
@@ -93,9 +112,14 @@ public final class Matrices {
         public boolean test(int i, int j, double value) {
             return Math.abs(value) < EPS;
         }
-    }
+    };
 
-    private static class TridiagonalMatrixPredicate implements MatrixPredicate {
+    /**
+     * Checks whether the matrix is a
+     * <a href="http://mathworld.wolfram.com/TridiagonalMatrix.html">tridiagonal
+     * matrix</a>.
+     */
+    public static final MatrixPredicate TRIDIAGONAL_MATRIX = new MatrixPredicate() {
         @Override
         public boolean test(int rows, int columns) {
             return rows == columns;
@@ -105,9 +129,14 @@ public final class Matrices {
         public boolean test(int i, int j, double value) {
             return Math.abs(i - j) <= 1 || Math.abs(value) < EPS;
         }
-    }
+    };
 
-    private static class PositiveMatrixPredicate implements MatrixPredicate {
+    /**
+     * Checks whether the matrix is a
+     * <a href="http://mathworld.wolfram.com/PositiveMatrix.html">positive
+     * matrix</a>.
+     */
+    public static final MatrixPredicate POSITIVE_MATRIX = new MatrixPredicate() {
         @Override
         public boolean test(int rows, int columns) {
             return true;
@@ -117,9 +146,14 @@ public final class Matrices {
         public boolean test(int i, int j, double value) {
             return value > 0.0;
         }
-    }
+    };
 
-    private static class NegativeMatrixPredicate implements MatrixPredicate {
+    /**
+     * Checks whether the matrix is a
+     * <a href="http://mathworld.wolfram.com/NegativeMatrix.html">negative
+     * matrix</a>.
+     */
+    public static final MatrixPredicate NEGATIVE_MATRIX = new MatrixPredicate() {
         @Override
         public boolean test(int rows, int columns) {
             return true;
@@ -129,11 +163,12 @@ public final class Matrices {
         public boolean test(int i, int j, double value) {
             return value < 0.0;
         }
-    }
+    };
 
-    private static class LowerBidiagonalMatrixPredicate 
-            implements MatrixPredicate {
-
+    /**
+     * Checks whether the matrix is a lower bi-diagonal matrix</a>.
+     */
+    public static final MatrixPredicate LOWER_BIDIAGONAL_MATRIX = new MatrixPredicate() {
         @Override
         public boolean test(int rows, int columns) {
             return rows == columns;
@@ -143,11 +178,12 @@ public final class Matrices {
         public boolean test(int i, int j, double value) {
             return !((i == j) || (i == j + 1)) || Math.abs(value) < EPS;
         }
-    }
+    };
 
-    private static class UpperBidiagonalMatrixPredicate 
-            implements MatrixPredicate {
-
+    /**
+     * Checks whether the matrix is an upper bidiagonal matrix.
+     */
+    public static final MatrixPredicate UPPER_BIDIAGONAL_MATRIX = new MatrixPredicate() {
         @Override
         public boolean test(int rows, int columns) {
             return rows == columns;
@@ -157,11 +193,14 @@ public final class Matrices {
         public boolean test(int i, int j, double value) {
             return !((i == j) || (i == j - 1)) || Math.abs(value) < EPS;
         }
-    }
+    };
 
-    private static class LowerTriangularMatrixPredicate 
-            implements MatrixPredicate {
-
+    /**
+     * Checks whether the matrix is a
+     * <a href="http://mathworld.wolfram.com/LowerTriangularMatrix.html">lower
+     * triangular matrix</a>.
+     */
+    public static final MatrixPredicate LOWER_TRIANGULAR_MATRIX = new MatrixPredicate() {
         @Override
         public boolean test(int rows, int columns) {
             return rows == columns;
@@ -171,11 +210,14 @@ public final class Matrices {
         public boolean test(int i, int j, double value) {
             return (i <= j) || Math.abs(value) < EPS;
         }
-    }
+    };
 
-    private static class UpperTriangularMatrixPredicate 
-            implements MatrixPredicate {
-
+    /**
+     * Checks whether the matrix is an
+     * <a href="http://mathworld.wolfram.com/UpperTriangularMatrix.html">upper
+     * triangular matrix</a>.
+     */
+    public static final MatrixPredicate UPPER_TRIANGULAR_MATRIX = new MatrixPredicate() {
         @Override
         public boolean test(int rows, int columns) {
             return rows == columns;
@@ -185,7 +227,7 @@ public final class Matrices {
         public boolean test(int i, int j, double value) {
             return (i >= j) || Math.abs(value) < EPS;
         }
-    }
+    };
 
     private static class SymmetricMatrixPredicate
             implements AdvancedMatrixPredicate {
@@ -236,638 +278,539 @@ public final class Matrices {
         }
     }
 
-    private static class InvertiblePredicate implements AdvancedMatrixPredicate {
-
-        @Override
-        public boolean test(Matrix matrix) {
-            return matrix.rows() == matrix.columns() && matrix.determinant() != 0.0;
-        }
-    }
-
-    private static class SquareMatrixPredicate implements AdvancedMatrixPredicate {
-
-        @Override
-        public boolean test(Matrix matrix) {
-            return matrix.rows() == matrix.columns();
-        }
-    }
-
     private static class PositiveDefiniteMatrixPredicate implements AdvancedMatrixPredicate {
 
         @Override
         public boolean test(Matrix matrix) {
-            if (matrix.rows() != matrix.columns() || matrix.determinant() <= 0) {
+            if (matrix.rows() != matrix.columns()) {
                 return false;
             }
 
-            int n = matrix.rows();
-            boolean result = true;
-            Matrix l = matrix.blank();
+            int size = matrix.columns();
+            int currentSize = 1;
 
-            for (int j = 0; j < n; j++) {
-                Vector rowj = l.getRow(j);
-                double d = 0.0;
+            while (currentSize <= size) {
+                Matrix topLeftMatrix = matrix.sliceTopLeft(currentSize, currentSize);
 
-                for (int k = 0; k < j; k++) {
-                    Vector rowk = l.getRow(k);
-                    double s = 0.0;
-
-                    for (int i = 0; i < k; i++) {
-                        s += rowk.get(i) * rowj.get(i);
-                    }
-
-                    s = (matrix.get(j, k) - s) / l.get(k, k);
-                    rowj.set(k, s);
-                    l.setRow(j, rowj);
-                    d = d + s * s;
+                if (topLeftMatrix.determinant() < 0) {
+                    return false;
                 }
 
-                d = matrix.get(j, j) - d;
-                result = result && (d > 0.0);
-                l.set(j, j, Math.sqrt(Math.max(d, 0.0)));
-
-                for (int k = j + 1; k < n; k++) {
-                    l.set(j, k, 0.0);
-                }
+                currentSize++;
             }
 
-            return result;
+            return true;
         }
-    }
-
-    private static class IncMatrixFunction 
-            implements MatrixFunction {
-        @Override
-        public double evaluate(int i, int j, double value) {
-            return value + 1.0;
-        }
-    }
-
-    private static class DecMatrixFunction 
-            implements MatrixFunction {
-        @Override
-        public double evaluate(int i, int j, double value) {
-            return value - 1.0;
-        }
-    }
-
-    private static class InvMatrixFunction 
-            implements MatrixFunction {
-        @Override
-        public double evaluate(int i, int j, double value) {
-            return -value;
-        }
-    }
-
-    private static class PlusMatrixFunction 
-            implements MatrixFunction {
-
-        private double arg;
-
-        public PlusMatrixFunction(double arg) {
-            this.arg = arg;
-        }
-
-        @Override
-        public double evaluate(int i, int j, double value) {
-            return value + arg; 
-        }
-    }
-
-    private static class MinusMatrixFunction 
-            implements MatrixFunction {
-
-        private double arg;
-
-        public MinusMatrixFunction(double arg) {
-            this.arg = arg;
-        }
-
-        @Override
-        public double evaluate(int i, int j, double value) {
-            return value - arg; 
-        }
-    }
-
-    private static class MulMatrixFunction 
-            implements MatrixFunction {
-
-        private double arg;
-
-        public MulMatrixFunction(double arg) {
-            this.arg = arg;
-        }
-
-        @Override
-        public double evaluate(int i, int j, double value) {
-            return value * arg; 
-        }
-    }
-
-    private static class DivMatrixFunction 
-            implements MatrixFunction {
-
-        private double arg;
-
-        public DivMatrixFunction(double arg) {
-            this.arg = arg;
-        }
-
-        @Override
-        public double evaluate(int i, int j, double value) {
-            return value / arg; 
-        }
-    }
-
-    private static class ModMatrixFunction
-            implements MatrixFunction {
-
-        private double arg;
-
-        public ModMatrixFunction(double arg) {
-            this.arg = arg;
-        }
-
-        @Override
-        public double evaluate(int i, int j, double value) {
-            return value % arg;
-        }
-    }
-
-    private static class SumMatrixAccumulator
-            implements MatrixAccumulator {
-
-        private BigDecimal result;
-        private final double neutral;
-
-        public SumMatrixAccumulator(double neutral_) {
-            this.neutral = neutral_;
-            this.result = new BigDecimal(neutral);
-        }
-
-        @Override
-        public void update(int i, int j, double value) {
-            result = result.add(new BigDecimal(value));
-        }
-
-        @Override
-        public double accumulate() {
-            return result.setScale(Matrices.ROUND_FACTOR, RoundingMode.CEILING).doubleValue();
-        }
-
-        @Override
-        public void reset() {
-            this.result = new BigDecimal(neutral);
-        }
-    }
-
-    private static class ProductMatrixAccumulator
-            implements MatrixAccumulator {
-
-        private BigDecimal result;
-        private final double neutral;
-
-        public ProductMatrixAccumulator(double neutral_) {
-            this.neutral = neutral_;
-            this.result = new BigDecimal(neutral);
-        }
-
-        @Override
-        public void update(int i, int j, double value) {
-            result = result.multiply(new BigDecimal(value));
-        }
-
-        @Override
-        public double accumulate() {
-            return result.setScale(Matrices.ROUND_FACTOR, RoundingMode.CEILING).doubleValue();
-
-        }
-
-        @Override
-        public void reset() {
-            this.result = new BigDecimal(neutral);
-        }
-    }
-
-    private static class FunctionMatrixAccumulator 
-                implements MatrixAccumulator {
-
-        private final MatrixAccumulator accumulator;
-        private final MatrixFunction function;
-
-        public FunctionMatrixAccumulator(MatrixAccumulator accumulator,
-                MatrixFunction function) {
-
-            this.accumulator = accumulator;
-            this.function = function;
-        }
-
-        @Override
-        public void update(int i, int j, double value) {
-            accumulator.update(i, j, function.evaluate(i, j, value));
-        }
-
-        @Override
-        public double accumulate() {
-            return accumulator.accumulate();
-        }
-
-        @Override
-        public void reset() {
-            this.accumulator.reset();
-        }
-    }
-
-    /**
-     * Creates a plus function with specified <code>value</code>. The function 
-     * evaluates like following: 
-     * <p>
-     * <center><code>something += value</code></center>
-     * </p>
-
-     * @param value
-     */
-    public static MatrixFunction asPlusFunction(double value) {
-        return new PlusMatrixFunction(value);
-    }
-
-    /**
-     * Creates a minus function with specified <code>value</code>. The function 
-     * evaluates like following: 
-     * <p>
-     * <center><code>something -= value</code></center>
-     * </p> 
-     * 
-     * @param value
-     * @return
-     */
-    public static MatrixFunction asMinusFunction(double value) {
-        return new MinusMatrixFunction(value);
-    }
-
-    /**
-     * Creates a multiply function with specified <code>value</code>. The 
-     * function evaluates like following: 
-     * <p>
-     * <center><code>something *= value</code></center>
-     * </p>
-     * 
-     * @param value
-     * @return
-     */
-    public static MatrixFunction asMulFunction(double value) {
-        return new MulMatrixFunction(value);
-    }
-
-    /**
-     * Creates a divide function with specified <code>value</code>. The function 
-     * evaluates like following: 
-     * <p>
-     * <center><code>something /= value</code></center>
-     * </p>
-     * 
-     * @param value
-     * @return
-     */
-    public static MatrixFunction asDivFunction(double value) {
-        return new DivMatrixFunction(value);
-    }
-
-    /**
-     * Creates a modulus function with specified <code>value</code>. The function 
-     * evaluates like following:
-     * <p>
-     * <center><code>something %= value</code></center>
-     * </p>
-     *
-     * @param value
-     * @return
-     */
-    public static MatrixFunction asModFunction(double value) {
-        return new ModMatrixFunction(value);
     }
 
     /**
      * Checks whether the matrix is a
-     * <a href="http://mathworld.wolfram.com/DiagonalMatrix.html">diagonal 
+     * <a href="http://mathworld.wolfram.com/SymmetricMatrix.html">symmetric
      * matrix</a>.
      */
-    public static final MatrixPredicate DIAGONAL_MATRIX = 
-            new DiagonalMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is an 
-     * <a href="http://mathworld.wolfram.com/IdentityMatrix.html">identity
-     * matrix</a>.
-     */
-    public static final MatrixPredicate IDENTITY_MATRIX = 
-            new IdentityMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is a
-     * <a href="http://mathworld.wolfram.com/ZeroMatrix.html">zero
-     * matrix</a>.
-     */
-    public static final MatrixPredicate ZERO_MATRIX = 
-            new ZeroMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is a 
-     * <a href="http://mathworld.wolfram.com/TridiagonalMatrix.html">tridiagonal
-     * matrix</a>.
-     */
-    public static final MatrixPredicate TRIDIAGONAL_MATRIX = 
-            new TridiagonalMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is a 
-     * <a href="http://mathworld.wolfram.com/PositiveMatrix.html">positive 
-     * matrix</a>.
-     */
-    public static final MatrixPredicate POSITIVE_MATRIX = 
-            new PositiveMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is a 
-     * <a href="http://mathworld.wolfram.com/NegativeMatrix.html">negative 
-     * matrix</a>.
-     */
-    public static final MatrixPredicate NEGATIVE_MATRIX = 
-            new NegativeMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is a lower bidiagonal matrix</a>.
-     */
-    public static final MatrixPredicate LOWER_BIDIAGONAL_MATRIX = 
-            new LowerBidiagonalMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is an upper bidiagonal matrix. 
-     */
-    public static final MatrixPredicate UPPER_BIDIAGONAL_MATRIX = 
-            new UpperBidiagonalMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is a
-     * <a href="http://mathworld.wolfram.com/LowerTriangularMatrix.html">lower 
-     * triangular matrix</a>.
-     */
-    public static final MatrixPredicate LOWER_TRIANGULAR_MARTIX = 
-            new LowerTriangularMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is an
-     * <a href="http://mathworld.wolfram.com/UpperTriangularMatrix.html">upper 
-     * triangular matrix</a>.
-     */
-    public static final MatrixPredicate UPPER_TRIANGULAR_MATRIX = 
-            new UpperTriangularMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is a 
-     * <a href="http://mathworld.wolfram.com/SymmetricMatrix.html">symmetric 
-     * matrix</a>. 
-     */
-    public static final AdvancedMatrixPredicate SYMMETRIC_MATRIX = 
+    public static final AdvancedMatrixPredicate SYMMETRIC_MATRIX =
             new SymmetricMatrixPredicate();
 
     /**
      * Checks whether the matrix is a
-     * <a href="http://en.wikipedia.org/wiki/Diagonally_dominant_matrix">dioganally dominant matrix</a>.
+     * <a href="http://en.wikipedia.org/wiki/Diagonally_dominant_matrix">diagonally dominant matrix</a>.
      */
-    public static final AdvancedMatrixPredicate DIAGONALLY_DOMINANT_MATRIX = 
+    public static final AdvancedMatrixPredicate DIAGONALLY_DOMINANT_MATRIX =
             new DiagonallyDominantPredicate();
 
     /**
-     * Checks whether the matrix is
-     * <a href="http://en.wikipedia.org/wiki/Invertible_matrix">invertible</a>.
+     * Checks whether the matrix is positive definite.
      */
-    public static final AdvancedMatrixPredicate INVERTIBLE_MATRIX =
-            new InvertiblePredicate();
-
-    public static final AdvancedMatrixPredicate POSITIVE_DEFINITE =
+    public static final AdvancedMatrixPredicate POSITIVE_DEFINITE_MATRIX =
             new PositiveDefiniteMatrixPredicate();
-
-    /**
-     * Checks whether the matrix is
-     * <a href="http://en.wikipedia.org/wiki/Square_matrix">square</a>.
-     */
-    public static final AdvancedMatrixPredicate SQUARE_MATRIX =
-            new SquareMatrixPredicate();
 
     /**
      * Increases each element of matrix by <code>1</code>.
      */
-    public static final MatrixFunction INC_FUNCTION = 
-            new IncMatrixFunction();
+    public static final MatrixFunction INC_FUNCTION = new MatrixFunction() {
+        @Override
+        public double evaluate(int i, int j, double value) {
+            return value + 1.0;
+        }
+    };
 
     /**
      * Decreases each element of matrix by <code>1</code>.
      */
-    public static final MatrixFunction DEC_FUNCTION = 
-            new DecMatrixFunction();
+    public static final MatrixFunction DEC_FUNCTION = new MatrixFunction() {
+        @Override
+        public double evaluate(int i, int j, double value) {
+            return value - 1.0;
+        }
+    };
 
     /**
-     * Inverts each element of matrix.  
+     * Inverts each element of matrix.
      */
-    public static final MatrixFunction INV_FUNCTION = 
-            new InvMatrixFunction();
+    public static final MatrixFunction INV_FUNCTION = new MatrixFunction() {
+        @Override
+        public double evaluate(int i, int j, double value) {
+            return -value;
+        }
+    };
 
     /**
-     * Creates a singleton <code>1x1</code> matrix from <code>value</code>.
-     * 
-     * @param value
-     * @return
+     * Creates a const function that evaluates it's argument to given {@code value}.
+     *
+     * @param arg a const value
+     *
+     * @return a closure object that does {@code _}
      */
+    public static MatrixFunction asConstFunction(final double arg) {
+        return new MatrixFunction() {
+            @Override
+            public double evaluate(int i, int j, double value) {
+                return arg;
+            }
+        };
+    }
+
+    /**
+     * Creates a plus function that adds given {@code value} to it's argument.
+     *
+     * @param arg a value to be added to function's argument
+     *
+     * @return a closure object that does {@code _ + _}
+     */
+    public static MatrixFunction asPlusFunction(final double arg) {
+        return new MatrixFunction() {
+            @Override
+            public double evaluate(int i, int j, double value) {
+                return value + arg;
+            }
+        };
+    }
+
+    /**
+     * Creates a minus function that subtracts given {@code value} from it's argument.
+     *
+     * @param arg a value to be subtracted from function's argument
+     *
+     * @return a closure that does {@code _ - _}
+     */
+    public static MatrixFunction asMinusFunction(final double arg) {
+        return new MatrixFunction() {
+            @Override
+            public double evaluate(int i, int j, double value) {
+                return value - arg;
+            }
+        };
+    }
+
+    /**
+     * Creates a mul function that multiplies given {@code value} by it's argument.
+     *
+     * @param arg a value to be multiplied by function's argument
+     *
+     * @return a closure that does {@code _ * _}
+     */
+    public static MatrixFunction asMulFunction(final double arg) {
+        return new MatrixFunction() {
+            @Override
+            public double evaluate(int i, int j, double value) {
+                return value * arg;
+            }
+        };
+    }
+
+    /**
+     * Creates a div function that divides it's argument by given {@code value}.
+     *
+     * @param arg a divisor value
+     *
+     * @return a closure that does {@code _ / _}
+     */
+    public static MatrixFunction asDivFunction(final double arg) {
+        return new MatrixFunction() {
+            @Override
+            public double evaluate(int i, int j, double value) {
+                return value / arg;
+            }
+        };
+    }
+
+    /**
+     * Creates a mod function that calculates the modulus of it's argument and given {@code value}.
+     *
+     * @param arg a divisor value
+     *
+     * @return a closure that does {@code _ % _}
+     */
+    public static MatrixFunction asModFunction(final double arg) {
+        return new MatrixFunction() {
+            @Override
+            public double evaluate(int i, int j, double value) {
+                return value % arg;
+            }
+        };
+    }
+
+    /**
+     * Makes a minimum matrix accumulator that accumulates the minimum of matrix elements.
+     *
+     * @return a minimum vector accumulator
+     */
+    public static MatrixAccumulator mkMinAccumulator() {
+        return new MatrixAccumulator() {
+            private double result = Double.POSITIVE_INFINITY;
+
+            @Override
+            public void update(int i, int j, double value) {
+                result = Math.min(result, value);
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result;
+                result = Double.POSITIVE_INFINITY;
+                return value;
+            }
+        };
+    }
+
+    /**
+     * Makes a maximum matrix accumulator that accumulates the maximum of matrix elements.
+     *
+     * @return a maximum vector accumulator
+     */
+    public static MatrixAccumulator mkMaxAccumulator() {
+        return new MatrixAccumulator() {
+            private double result = Double.NEGATIVE_INFINITY;
+
+            @Override
+            public void update(int i, int j, double value) {
+                result = Math.max(result, value);
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result;
+                result = Double.NEGATIVE_INFINITY;
+                return value;
+            }
+        };
+    }
+
+    /**
+     * Creates a sum matrix accumulator that calculates the sum of all elements in the matrix.
+     *
+     * @param neutral the neutral value
+     *
+     * @return a sum accumulator
+     */
+    public static MatrixAccumulator asSumAccumulator(final double neutral) {
+        return new MatrixAccumulator() {
+            private BigDecimal result = new BigDecimal(neutral);
+
+            @Override
+            public void update(int i, int j, double value) {
+                result = result.add(new BigDecimal(value));
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result.setScale(Matrices.ROUND_FACTOR, RoundingMode.CEILING).doubleValue();
+                result = new BigDecimal(neutral);
+                return value;
+            }
+        };
+    }
+
+    /**
+     * Creates a product matrix accumulator that calculates the product of all elements in the matrix.
+     *
+     * @param neutral the neutral value
+     *
+     * @return a product accumulator
+     */
+    public static MatrixAccumulator asProductAccumulator(final double neutral) {
+        return new MatrixAccumulator() {
+            private BigDecimal result = new BigDecimal(neutral);
+
+            @Override
+            public void update(int i, int j, double value) {
+                result = result.multiply(new BigDecimal(value));
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result.setScale(Matrices.ROUND_FACTOR, RoundingMode.CEILING).doubleValue();
+                result = new BigDecimal(neutral);
+                return value;
+            }
+        };
+    }
+
+    /**
+     * Creates a sum function accumulator, that calculates the sum of all
+     * elements in the matrix after applying given {@code function} to each of them.
+     *
+     * @param neutral the neutral value
+     * @param function the matrix function
+     *
+     * @return a sum function accumulator
+     */
+    public static MatrixAccumulator asSumFunctionAccumulator(final double neutral, final MatrixFunction function) {
+        return new MatrixAccumulator() {
+            private final MatrixAccumulator sumAccumulator = Matrices.asSumAccumulator(neutral);
+
+            @Override
+            public void update(int i, int j, double value) {
+                sumAccumulator.update(i, j, function.evaluate(i, j, value));
+            }
+
+            @Override
+            public double accumulate() {
+                return sumAccumulator.accumulate();
+            }
+        };
+    }
+
+    /**
+     * Creates a product function accumulator, that calculates the product of
+     * all elements in the matrix after applying given {@code function} to
+     * each of them.
+     *
+     * @param neutral the neutral value
+     * @param function the matrix function
+     *
+     * @return a product function accumulator
+     */
+    public static MatrixAccumulator asProductFunctionAccumulator(final double neutral,
+                                                                 final MatrixFunction function) {
+        return new MatrixAccumulator() {
+            private final MatrixAccumulator productAccumulator = Matrices.asProductAccumulator(neutral);
+
+            @Override
+            public void update(int i, int j, double value) {
+                productAccumulator.update(i, j, function.evaluate(i, j, value));
+            }
+
+            @Override
+            public double accumulate() {
+                return productAccumulator.accumulate();
+            }
+        };
+    }
+
+    /**
+     * Creates an accumulator procedure that adapts a matrix accumulator for procedure
+     * interface. This is useful for reusing a single accumulator for multiple fold operations
+     * in multiple matrices.
+     *
+     * @param accumulator the matrix accumulator
+     *
+     * @return an accumulator procedure
+     */
+    public static MatrixProcedure asAccumulatorProcedure(final MatrixAccumulator accumulator) {
+        return new MatrixProcedure() {
+            @Override
+            public void apply(int i, int j, double value) {
+                accumulator.update(i, j, value);
+            }
+        };
+    }
+
+    /**
+     * Creates a singleton 1x1 matrix of given {@code value}.
+     *
+     * @param value the singleton value
+     *
+     * @return a singleton matrix
+     */
+    @Deprecated
     public static Matrix asSingletonMatrix(double value) {
         return LinearAlgebra.DEFAULT_FACTORY.createMatrix(new double[][]{{ value }});
     }
 
     /**
-     * Wraps the <code>matrix</code> with interface that provides safe accessors
-     * and modifiers.
-     * 
-     * @param matrix
-     * @return
+     * Creates a matrix source of given {@code matrix}.
+     *
+     * @param matrix the source matrix
+     *
+     * @return a matrix source
      */
-    public static Matrix asSafeMatrix(Matrix matrix) {
-        return matrix.safe();
+    public static MatrixSource asMatrixSource(Matrix matrix) {
+        return new LoopbackMatrixSource(matrix);
     }
 
     /**
-     * Unwraps the safe <code>matrix</code>.
-     * 
-     * @param matrix
-     * @return
+     * Creates a 1D-array matrix source of given {@code array} reference.
+     *
+     * @param rows the number of rows in the source
+     * @param columns the number of columns in the source
+     * @param array the array reference
+     *
+     * @return a 1D-array matrix source
      */
-    public static Matrix asUnsafeMatrix(Matrix matrix) {
-        return matrix.unsafe();
-    }
-
-    /**
-     * Creates a safe matrix source with specified <code>matrix</code>.
-     * 
-     * @param matrix
-     * @return
-     */
-    public static MatrixSource asSafeSource(Matrix matrix) {
-        return new SafeMatrixSource(matrix);
-    }
-
-    /**
-     * Creates a unsafe matrix source with specified <code>matrix</code>.
-     * 
-     * @param matrix
-     * @return
-     */
-    public static MatrixSource asUnsafeSource(Matrix matrix) {
-        return new UnsafeMatrixSource(matrix);
-    }
-
-    /**
-     * Creates a 1D array matrix source with specified dimensions and 
-     * <code>array</code> reference. 
-     * 
-     * @param rows
-     * @param columns
-     * @param array
-     * @return
-     */
-    public static MatrixSource asArray1DSource(int rows, int columns, 
-            double[] array) {
-
+    public static MatrixSource asArray1DSource(int rows, int columns, double[] array) {
         return new Array1DMatrixSource(rows, columns, array);
     }
 
     /**
-     * Creates a 2D array matrix source with specified <code>array</code> 
-     * reference.
-     * 
-     * @param array
-     * @return
+     * Creates a 2D-array matrix source of given {@code array} reference.
+     *
+     * @param array the array reference
+     *
+     * @return a 2D-array matrix source
      */
     public static MatrixSource asArray2DSource(double[][] array) {
         return new Array2DMatrixSource(array);
     }
 
     /**
-     * Creates an identity matrix source with specified <code>size</code>.
-     * 
-     * @param size
-     * @return
+     * Creates an identity matrix source of given {@code size}.
+     *
+     * @param size the source size
+     *
+     * @return an identity matrix source
      */
+    @Deprecated
     public static MatrixSource asIdentitySource(int size) {
         return new IdentityMatrixSource(size);
     }
 
     /**
-     * Creates a random matrix source with specified dimensions.
-     * 
-     * @param rows
-     * @param columns
-     * @return
+     * Creates a random matrix source of specified dimensions.
+     *
+     * @param rows the number of rows in the source
+     * @param columns the number of columns in the source
+     * @param random the random generator instance
+     *
+     * @return a random matrix source
      */
-    public static MatrixSource asRandomSource(int rows, int columns) {
-        return new RandomMatrixSource(rows, columns);
+    public static MatrixSource asRandomSource(int rows, int columns, Random random) {
+        return new RandomMatrixSource(rows, columns, random);
     }
 
     /**
-     * Creates a random symmetric matrix source with specified 
-     * <code>size</code>.
-     * 
-     * @param size
-     * @return
+     * Creates a random symmetric matrix source of given {@code size}.
+     *
+     * @param size the size of the source
+     *
+     * @return a random symmetric matrix source
      */
+    @Deprecated
     public static MatrixSource asRandomSymmetricSource(int size) {
         return new RandomSymmetricMatrixSource(size);
     }
 
     /**
-     * Creates a MatrixMarket stream source with specified input stream.
-     * 
-     * @param in
-     * @return
+     * Creates a MatrixMarket stream source of given input stream {@code in}.
+     *
+     * @param in the input stream
+     *
+     * @return a MatrixMarket stream source
      */
+    @Deprecated
     public static MatrixSource asMatrixMarketSource(InputStream in) {
         return new StreamMatrixSource(new MatrixMarketStream(in));
     }
 
     /**
-     * Creates a symbol separated stream source (like CSV) with specified
-     * input stream.
-     * 
-     * @param in
-     * @return
+     * Creates a symbol separated stream source (like CSV) of given input stream {@code in}.
+     *
+     * @param in the input stream
+     *
+     * @return a symbol separated stream source
      */
+    @Deprecated
     public static MatrixSource asSymbolSeparatedSource(InputStream in) {
         return new StreamMatrixSource(new SymbolSeparatedStream(in));
     }
 
     /**
-     * Creates a symbol separated stream source (like CSV) with specified
-     * input stream and <code>separator</code>.
-     * 
-     * @param in
-     * @param separator
-     * @return
+     * Creates a symbol separated stream source (like CSV) of given input stream {@code in}.
+     *
+     * @param in the input stream
+     * @param separator the values' separator
+     *
+     * @return a symbol separated stream source
      */
-    public static MatrixSource asSymbolSeparatedSource(InputStream in, 
-            String separator) {
-
+    @Deprecated
+    public static MatrixSource asSymbolSeparatedSource(InputStream in, String separator) {
         return new StreamMatrixSource(new SymbolSeparatedStream(in, separator));
     }
 
     /**
-     * Creates a sum matrix accumulator, that calculates the sum of all 
-     * elements of matrix. 
-     * 
-     * @param neutral
-     * @return
+     * Creates a new matrix builder instance of given {@code factory}.
+     *
+     * @param factory the builder's factory
+     *
+     * @return a factorised matrix builder
      */
-    public static MatrixAccumulator asSumAccumulator(double neutral) {
-        return new SumMatrixAccumulator(neutral);
+    public static MatrixBuilder asBuilder(Factory factory) {
+        return new TerminalMatrixBuilder(factory);
     }
 
     /**
-     * Creates a product matrix accumulator, that calculates the product of all
-     * elements of matrix.
-     * 
-     * @param neutral
-     * @return
+     * Creates a default 1x1 matrix from given {@code value}.
+     *
+     * @param value of the matrix
+     *
+     * @return a default 1x1 matrix
      */
-    public static MatrixAccumulator asProductAccumulator(double neutral) {
-        return new ProductMatrixAccumulator(neutral);
+    public static Matrix asMatrix1x1(double value) {
+        return LinearAlgebra.DEFAULT_FACTORY.createMatrix(new double[][]{{ value }});
     }
 
     /**
-     * Creates a sum function accumulator, that calculates the sum of all 
-     * elements of matrix after applying a <code>function</code> to 
-     * each of them.
-     * 
-     * @param neutral
-     * @param function
-     * @return
+     * Creates a default 2x2 matrix from given {@code value}.
+     *
+     * @param values of the matrix
+     *
+     * @return a default 2x2 matrix
      */
-    public static MatrixAccumulator asSumFunctionAccumulator(double neutral, 
-            MatrixFunction function) {
-
-        return new FunctionMatrixAccumulator(new SumMatrixAccumulator(neutral), 
-                                             function);
+    public static Matrix asMatrix2x2(double... values) {
+        return LinearAlgebra.DEFAULT_FACTORY.createMatrix(unflatten(values, 2));
     }
 
     /**
-     * Creates a produce function accumulator, that calculates the produce of
-     * all elements of matrix after applying a <code>function</code> to
-     * each of them.
-     * 
-     * @param neutral
-     * @param function
-     * @return
+     * Creates a default 3x3 matrix from given {@code value}.
+     *
+     * @param values of the matrix
+     *
+     * @return a default 3x3 matrix
      */
-    public static MatrixAccumulator asProductFunctionAccumulator(double neutral, 
-            MatrixFunction function) {
+    public static Matrix asMatrix3x3(double... values) {
+        return LinearAlgebra.DEFAULT_FACTORY.createMatrix(unflatten(values, 3));
+    }
 
-        return new FunctionMatrixAccumulator(new ProductMatrixAccumulator(
-                                             neutral), function);
+    /**
+     * Creates a default 4x4 matrix from given {@code value}.
+     *
+     * @param values of the matrix
+     *
+     * @return a default 4x4 matrix
+     */
+    public static Matrix asMatrix4x4(double... values) {
+        return LinearAlgebra.DEFAULT_FACTORY.createMatrix(unflatten(values, 4));
+    }
+
+    /**
+     * TODO: It might be a good idea to put internal routines into a special utility class.
+     *
+     * An internal routine that un-flats given 1D {@code array} to square 2D array with size {@code n}.
+     *
+     * @param array the 1D array
+     * @param n the size of square 2D array
+     *
+     * @return the square 2D array
+     */
+    private static double[][] unflatten(double array[], int n) {
+        double result[][] = new double[n][n];
+
+        int m = Math.min(array.length, n * n);
+
+        for (int i = 0; i < m; i++) {
+            result[i / n][i % n] = array[i];
+        }
+
+        return result;
     }
 }

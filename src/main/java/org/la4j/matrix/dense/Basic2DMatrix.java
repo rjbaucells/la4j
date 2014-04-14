@@ -43,7 +43,7 @@ public class Basic2DMatrix extends AbstractBasicMatrix implements DenseMatrix {
     }
 
     public Basic2DMatrix(Matrix matrix) {
-        this(Matrices.asUnsafeSource(matrix));
+        this(Matrices.asMatrixSource(matrix));
     }
 
     public Basic2DMatrix(MatrixSource source) {
@@ -58,6 +58,18 @@ public class Basic2DMatrix extends AbstractBasicMatrix implements DenseMatrix {
 
     public Basic2DMatrix(int rows, int columns) {
         this(new double[rows][columns]);
+    }
+
+    public Basic2DMatrix(int rows, int columns, double array[]) {
+        this(rows, columns);
+
+        // TODO:
+        // We suppose that 'array.length = rows * columns' for now.
+        // Probably, we should check this explicitly.
+
+        for (int i = 0; i < rows; i++) {
+            System.arraycopy(array, i * columns, self[i], 0, columns);
+        }
     }
 
     public Basic2DMatrix(double array[][]) {

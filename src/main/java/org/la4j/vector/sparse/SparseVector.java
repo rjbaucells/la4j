@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013, by Vladimir Kostyukov and Contributors.
+ * Copyright 2011-2014, by Vladimir Kostyukov and Contributors.
  * 
  * This file is part of la4j project (http://la4j.org)
  * 
@@ -21,20 +21,70 @@
 
 package org.la4j.vector.sparse;
 
-import org.la4j.vector.*;
+import org.la4j.vector.Vector;
+import org.la4j.vector.functor.VectorAccumulator;
+import org.la4j.vector.functor.VectorProcedure;
 
 public interface SparseVector extends Vector {
 
     /**
-     * Returns the number of non-zero elements of this vector.
-     * 
-     * @return the number of non-zero elements of this vector
+     * Returns the cardinality (the number of non-zero elements)
+     * of this sparse vector.
+     *
+     * @return the cardinality of this vector
      */
     int cardinality();
 
     /**
-     * 
-     * @return
+     * Returns the density (non-zero elements divided by total elements)
+     * of this sparse vector.
+     *
+     * @return the density of this vector
      */
     double density();
+
+    /**
+     * Whether or not the specified element is zero.
+     *
+     * @param i element's index
+     *
+     * @return {@code true} if specified element is zero, {@code false} otherwise
+     */
+    boolean isZeroAt(int i);
+
+    /**
+     * * Whether or not the specified element is not zero.
+     *
+     * @param i element's index
+     *
+     * @return {@code true} if specified element is zero, {@code false} otherwise
+     */
+    boolean nonZeroAt(int i);
+
+    /**
+     * Folds non-zero elements of this vector with given {@code accumulator}.
+     *
+     * @param accumulator the vector accumulator
+     *
+     * @return the accumulated value
+     */
+    double foldNonZero(VectorAccumulator accumulator);
+
+    /**
+     * Applies given {@code procedure} to each non-zero element of this vector.
+     *
+     * @param procedure the vector procedure
+     */
+    void eachNonZero(VectorProcedure procedure);
+
+    /**
+     * Gets the specified element, or a {@code defaultValue} if there
+     * is no actual element at index {@code i} in this sparse vector.
+     *
+     * @param i the element's index
+     * @param defaultValue the default value
+     *
+     * @return the element of this vector or a default value
+     */
+    double getOrElse(int i, double defaultValue);
 }

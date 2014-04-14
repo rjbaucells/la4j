@@ -22,6 +22,7 @@
  *                 Yuriy Drozd
  *                 Maxim Samoylov
  *                 Anveshi Charuvaka
+ *                 Todd Brunhoff
  * 
  */
 
@@ -29,6 +30,8 @@ package org.la4j.matrix;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.Random;
 
 import org.la4j.LinearAlgebra;
@@ -44,6 +47,22 @@ import org.la4j.matrix.functor.MatrixProcedure;
 import org.la4j.vector.Vector;
 
 public abstract class AbstractMatrix implements Matrix {
+
+    private static final String DEFAULT_ROWS_DELIMITER = "\n";
+    private static final String DEFAULT_COLUMNS_DELIMITER = " ";
+    private static final NumberFormat DEFAULT_FORMATTER = new DecimalFormat("0.000");
+    private static final String[] INDENTS = { // 9 predefined indents for alignment
+            " ",
+            "  ",
+            "   ",
+            "    ",
+            "     ",
+            "      ",
+            "       ",
+            "        ",
+            "         ",
+            "          "
+    };
 
     protected int rows;
     protected int columns;
@@ -61,11 +80,17 @@ public abstract class AbstractMatrix implements Matrix {
 
     @Override
     public void assign(double value) {
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                set(i, j, value);
-            }
-        }
+        update(Matrices.asConstFunction(value));
+    }
+
+    @Override
+    public void assignRow(int i, double value) {
+        updateRow(i, Matrices.asConstFunction(value));
+    }
+
+    @Override
+    public void assignColumn(int j, double value) {
+        updateColumn(j, Matrices.asConstFunction(value));
     }
 
     @Override
@@ -580,7 +605,7 @@ public abstract class AbstractMatrix implements Matrix {
         ensureFactoryIsNotNull(factory);
 
         if (is(Matrices.UPPER_TRIANGULAR_MATRIX) 
-                || is(Matrices.LOWER_TRIANGULAR_MARTIX)) {
+                || is(Matrices.LOWER_TRIANGULAR_MATRIX)) {
 
             return copy(factory);
         }
@@ -708,7 +733,9 @@ public abstract class AbstractMatrix implements Matrix {
 
         ensureFactoryIsNotNull(factory);
 
-        // TODO: add range check
+        if (untilRow - fromRow < 0 || untilColumn - fromColumn < 0) {
+            fail("Wrong slice range: [" + fromRow + ".." + untilRow + "][" + fromColumn + ".." + untilColumn + "].");
+        }
 
         Matrix result = factory.createMatrix(untilRow - fromRow, untilColumn - fromColumn);
 
@@ -755,17 +782,14 @@ public abstract class AbstractMatrix implements Matrix {
             fail("No rows or columns selected.");
         }
 
-        // Test all rowIndices and columnIndices are within bounds
-        // TODO: Since matrices are unsafe by default we might want to skip this check.
-        checkIndexBounds(rowIndices, rows);
-        checkIndexBounds(columnIndices, columns);
-
         Matrix result = factory.createMatrix(newRows, newCols);
+
         for (int i = 0; i < newRows; i++) {
             for (int j = 0; j < newCols; j++) {
                 result.set(i, j, get(rowIndices[i], columnIndices[j]));
             }
         }
+
         return result;
     }
 
@@ -798,126 +822,33 @@ public abstract class AbstractMatrix implements Matrix {
     }
 
     @Override
-    public void eachNonZero(MatrixProcedure procedure) {
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                if (Math.abs(get(i,j)) > Matrices.EPS) {
-                    procedure.apply(i, j, get(i, j));
-                }
-            }
-        }
-    }
-
-    @Override
-    public void eachNonZeroInRow(int i, MatrixProcedure procedure) {
-        for (int j = 0; j < columns; j++) {
-            if (Math.abs(get(i, j)) > Matrices.EPS) {
-                procedure.apply(i, j, get(i, j));
-            }
-        }
-    }
-
-    @Override
-    public void eachNonZeroInColumn(int j, MatrixProcedure procedure) {
-        for (int i = 0; i < rows; i++) {
-            if (Math.abs(get(i, j)) > Matrices.EPS) {
-                procedure.apply(i, j, get(i, j));
-            }
-        }
-    }
-
-    @Override
     public double max() {
-
-        double max = Double.NEGATIVE_INFINITY;
-
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                double value = get(i, j);
-                if (value > max) {
-                    max = value;
-                }
-            }
-        }
-
-        return max;
+        return fold(Matrices.mkMaxAccumulator());
     }
 
     @Override
     public double min() {
-
-        double min = Double.POSITIVE_INFINITY;
-
-        for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < columns; j++) {
-                double value = get(i, j);
-                if (value < min) {
-                    min = value;
-                }
-            }
-        }
-
-        return min;
+        return fold(Matrices.mkMinAccumulator());
     }
 
     @Override
     public double maxInRow(int i) {
-
-        double max = Double.NEGATIVE_INFINITY;
-
-        for (int j = 0; j < columns; j++) {
-            double value = get(i, j);
-            if (value > max) {
-                max = value;
-            }
-        }
-
-        return max;
+        return foldRow(i, Matrices.mkMaxAccumulator());
     }
 
     @Override
     public double minInRow(int i) {
-
-        double min = Double.POSITIVE_INFINITY;
-
-        for (int j = 0; j < columns; j++) {
-            double value = get(i, j);
-            if (value < min) {
-                min = value;
-            }
-        }
-
-        return min;
+        return foldRow(i, Matrices.mkMinAccumulator());
     }
 
     @Override
     public double maxInColumn(int j) {
-
-        double max = Double.NEGATIVE_INFINITY;
-
-        for (int i = 0; i < rows; i++) {
-            double value = get(i, j);
-            if (value > max) {
-                max = value;
-            }
-        }
-
-        return max;
+        return foldColumn(j, Matrices.mkMaxAccumulator());
     }
 
     @Override
     public double minInColumn(int j) {
-
-        double min = Double.POSITIVE_INFINITY;
-
-        for (int i = 0; i < rows; i++) {
-            double value = get(i, j);
-            if (value < min) {
-                min = value;
-            }
-        }
-
-        return min;
+        return foldColumn(j, Matrices.mkMinAccumulator());
     }
 
     @Override
@@ -953,6 +884,40 @@ public abstract class AbstractMatrix implements Matrix {
     }
 
     @Override
+    public Matrix transformRow(int i, MatrixFunction function) {
+        return transformRow(i, function, factory);
+    }
+
+    @Override
+    public Matrix transformRow(int i, MatrixFunction function, Factory factory) {
+
+        Matrix result = copy(factory);
+
+        for (int j = 0; j < columns; j++) {
+            result.set(i, j, function.evaluate(i, j, result.get(i, j)));
+        }
+
+        return result;
+    }
+
+    @Override
+    public Matrix transformColumn(int j, MatrixFunction function) {
+        return transformColumn(j, function, factory);
+    }
+
+    @Override
+    public Matrix transformColumn(int j, MatrixFunction function, Factory factory) {
+
+        Matrix result = copy(factory);
+
+        for (int i = 0; i < rows; i++) {
+            result.set(i, j, function.evaluate(i, j, result.get(i, j)));
+        }
+
+        return result;
+    }
+
+    @Override
     public void update(MatrixFunction function) {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
@@ -964,6 +929,20 @@ public abstract class AbstractMatrix implements Matrix {
     @Override
     public void update(int i, int j, MatrixFunction function) {
         set(i, j, function.evaluate(i, j, get(i, j)));
+    }
+
+    @Override
+    public void updateRow(int i, MatrixFunction function) {
+        for (int j = 0; j < columns; j++) {
+            update(i, j, function);
+        }
+    }
+
+    @Override
+    public void updateColumn(int j, MatrixFunction function) {
+        for (int i = 0; i < rows; i++) {
+            update(i, j, function);
+        }
     }
 
     @Override
@@ -990,14 +969,14 @@ public abstract class AbstractMatrix implements Matrix {
 
     @Override
     public Vector foldRows(MatrixAccumulator accumulator) {
-        ensureFactoryIsNotNull(factory);
-    
-        Vector sum = factory.createVector(rows);
+
+        Vector result = factory.createVector(rows);
+
         for (int i = 0; i < rows; i++) {
-          sum.set(i, foldRow(i, accumulator));
-          accumulator.reset();
+          result.set(i, foldRow(i, accumulator));
         }
-        return sum;
+
+        return result;
     }
 
     @Override
@@ -1012,14 +991,14 @@ public abstract class AbstractMatrix implements Matrix {
 
     @Override
     public Vector foldColumns(MatrixAccumulator accumulator) {
-        ensureFactoryIsNotNull(factory);
-    
-        Vector sum = factory.createVector(columns);
+
+        Vector result = factory.createVector(columns);
+
         for (int i = 0; i < columns; i++) {
-          sum.set(i, foldColumn(i, accumulator));
-          accumulator.reset();
+          result.set(i, foldColumn(i, accumulator));
         }
-        return sum;
+
+        return result;
     }
 
     @Override
@@ -1049,11 +1028,6 @@ public abstract class AbstractMatrix implements Matrix {
     @Override
     public boolean non(AdvancedMatrixPredicate predicate) {
         return !is(predicate);
-    }
-
-    @Override
-    public Matrix unsafe() {
-        return this;
     }
 
     @Override
@@ -1143,16 +1117,35 @@ public abstract class AbstractMatrix implements Matrix {
 
     @Override
     public String toString() {
+        return mkString(DEFAULT_FORMATTER,
+                        DEFAULT_ROWS_DELIMITER,
+                        DEFAULT_COLUMNS_DELIMITER);
+    }
 
-        final int precision = 3; 
+    @Override
+    public String mkString(NumberFormat formatter) {
+        return mkString(formatter,
+                        DEFAULT_ROWS_DELIMITER,
+                        DEFAULT_COLUMNS_DELIMITER);
+    }
+
+    @Override
+    public String mkString(String rowsDelimiter, String columnsDelimiter) {
+        return mkString(DEFAULT_FORMATTER,
+                        rowsDelimiter,
+                        columnsDelimiter);
+    }
+
+    @Override
+    public String mkString(NumberFormat formatter, String rowsDelimiter, String columnsDelimiter) {
 
         int formats[] = new int[columns];
 
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
                 double value = get(i, j);
-                int size = String.valueOf((long) value).length() 
-                           + precision + (value < 0 && value > -1.0 ? 1 : 0) + 2;
+                String output = formatter.format(value);
+                int size = output.length();
                 formats[j] = size > formats[j] ? size : formats[j];
             }
         }
@@ -1161,10 +1154,22 @@ public abstract class AbstractMatrix implements Matrix {
 
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < columns; j++) {
-                sb.append(String.format("%" + Integer.toString(formats[j])
-                        + "." + precision + "f", get(i, j)));
+                String output = formatter.format(get(i, j));
+                int outputLength = output.length();
+
+                if (outputLength < formats[j]) {
+                    int align = formats[j] - outputLength;
+                    if (align > INDENTS.length - 1) {
+                        indent(sb, align);
+                    } else {
+                        sb.append(INDENTS[align - 1]);
+                    }
+                }
+
+                sb.append(output);
+                sb.append(columnsDelimiter);
             }
-            sb.append("\n");
+            sb.append(rowsDelimiter);
         }
 
         return sb.toString();
@@ -1192,23 +1197,11 @@ public abstract class AbstractMatrix implements Matrix {
     protected void fail(String message) {
         throw new IllegalArgumentException(message);
     }
-    
-    /*
-     * TODO should make the utility function static and maybe move them to a
-     * better location to be re-used in other classes.
-     */
 
-    /***
-     * Verifies that all the elements in the indexList are less than the bound
-     * 
-     * @param indexList
-     * @param bound
-     */
-    protected void checkIndexBounds(int[] indexList, int bound) {
-        for (int i = 0; i < indexList.length; i++) {
-            if (indexList[i] >= bound || indexList[i] < 0) {
-                fail("Index value out of bounds");
-            }
+    private void indent(StringBuilder sb, int howMany) {
+        while (howMany > 0) {
+            sb.append(" ");
+            howMany--;
         }
     }
 }

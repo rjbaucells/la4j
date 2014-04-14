@@ -35,6 +35,8 @@ import junit.framework.TestCase;
 
 import org.la4j.factory.Factory;
 import org.la4j.matrix.Matrix;
+import org.la4j.vector.functor.VectorAccumulator;
+import org.la4j.vector.functor.VectorPredicate;
 
 public abstract class AbstractVectorTest extends TestCase {
 
@@ -52,6 +54,18 @@ public abstract class AbstractVectorTest extends TestCase {
         assertEquals(13.0, a.get(0));
 
         assertEquals(0.0, a.get(1));
+    }
+
+    public void testAssign_4() {
+
+        Vector a = factory().createVector(4);
+        Vector b = factory().createVector(new double[] {
+                10.0, 10.0, 10.0, 10.0
+        });
+
+        a.assign(10.0);
+
+        assertEquals(b, a);
     }
 
     public void testResize_3_to_5_to_2() {
@@ -130,6 +144,57 @@ public abstract class AbstractVectorTest extends TestCase {
         assertEquals(c, a.sliceRight(1));
     }
 
+    public void testSelect_4() {
+        Vector a = factory().createVector(new double[]
+                { 0.0, 3.0, 7.0, 0.0 }
+        );
+
+        Vector b = factory().createVector(new double[]
+                { 3.0, 0.0, 0.0, 7.0 }
+        );
+
+        Vector c = factory().createVector(new double[]
+                { 7.0, 7.0, 0.0, 0.0 }
+        );
+
+        assertEquals(b, a.select(new int[]{ 1, 0, 3, 2 }));
+        assertEquals(c, a.select(new int[]{ 2, 2, 0, 3 }));
+    }
+
+    public void testSelect_5() {
+        Vector a = factory().createVector(new double[]
+                { 1.0, 6.0, 0.0, 0.0, 8.0 }
+        );
+
+        Vector b = factory().createVector(new double[]
+                { 1.0, 1.0, 1.0 }
+        );
+
+        Vector c = factory().createVector(new double[]
+                { 0.0, 0.0, 8.0, 8.0, 1.0, 0.0 }
+        );
+
+        assertEquals(b, a.select(new int[]{ 0, 0, 0 }));
+        assertEquals(c, a.select(new int[]{ 2, 3, 4, 4, 0, 3 }));
+    }
+
+    public void testSelect_3() {
+        Vector a = factory().createVector(new double[]
+                { 1.0, 0.0, 0.0 }
+        );
+
+        Vector b = factory().createVector(new double[]
+                { 0.0, 0.0, 0.0, 0.0 }
+        );
+
+        Vector c = factory().createVector(new double[]
+                { 1.0 }
+        );
+
+        assertEquals(b, a.select(new int[]{ 1, 2, 2, 1 }));
+        assertEquals(c, a.select(new int[]{ 0 }));
+    }
+
     public void testSwap_5() {
 
         Vector a = factory().createVector(new double[] 
@@ -200,13 +265,34 @@ public abstract class AbstractVectorTest extends TestCase {
         assertEquals(b, a);
     }
 
-    public void testNorm_4() {
+    public void testEuclideanNorm_3() {
+        Vector a = factory().createVector(new double[] { 1.0, 2.0, 3.0 });
+        assertEquals(3.74165, a.fold(Vectors.mkEuclideanNormAccumulator()), 1e-5);
+    }
 
-        Vector a = factory().createVector(new double[] { 0.0, 0.0, 0.0, 4.0 });
-        Vector b = factory().createVector(new double[] { 0.0, 0.0, 0.0, 1.0 });
+    public void testEuclideanNorm_5() {
+        Vector a = factory().createVector(new double[] { 1.0, 0.0, 3.0, 0.0, -5.0 });
+        assertEquals(5.91607, a.fold(Vectors.mkEuclideanNormAccumulator()), 1e-5);
+    }
 
-        assertEquals(4.0, a.norm());
-        assertEquals(b, a.normalize());
+    public void testManhattanNorm_3() {
+        Vector a = factory().createVector(new double[] { 1.0, 2.0, 3.0 });
+        assertEquals(6.0, a.fold(Vectors.mkManhattanNormAccumulator()), 1e-5);
+    }
+
+    public void testManhattanNorm_5() {
+        Vector a = factory().createVector(new double[] { 1.0, 0.0, 3.0, 0.0, -5.0 });
+        assertEquals(9.0, a.fold(Vectors.mkManhattanNormAccumulator()), 1e-5);
+    }
+
+    public void testInfinityNorm_3() {
+        Vector a = factory().createVector(new double[] { 1.0, 2.0, 3.0 });
+        assertEquals(3.0, a.fold(Vectors.mkInfinityNormAccumulator()), 1e-5);
+    }
+
+    public void testInfinityNorm_5() {
+        Vector a = factory().createVector(new double[] { 1.0, 0.0, 3.0, 0.0, -5.0 });
+        assertEquals(5.0, a.fold(Vectors.mkInfinityNormAccumulator()), 1e-5);
     }
 
     public void testAdd_3() {
@@ -545,5 +631,75 @@ public abstract class AbstractVectorTest extends TestCase {
         assertEquals(0.0, a.min());
     }
 
+    public void testFold_6() {
+        Vector a = factory().createVector(new double[] { 0.0, 0.0, 5.0, 0.0, 2.0, 1.0 });
 
+        VectorAccumulator sum = Vectors.asSumAccumulator(0.0);
+        VectorAccumulator product = Vectors.asProductAccumulator(1.0);
+
+        assertEquals(8.0, a.fold(sum));
+        // check whether the accumulator were flushed
+        assertEquals(8.0, a.fold(sum));
+
+        assertEquals(0.0, a.fold(product));
+        // check whether the accumulator were flushed
+        assertEquals(0.0, a.fold(product));
+    }
+
+    public void testIssue162_0() {
+
+         VectorPredicate pi = new VectorPredicate() {
+             @Override
+             public boolean test(int i, double value) {
+                 return value == 3.14;
+             }
+         };
+
+         Vector a = factory().createVector();
+         Vector b = a.resize(31);
+
+         assertEquals(0, a.length());
+         assertEquals(31, b.length());
+
+         b.assign(3.14);
+         assertTrue(b.is(pi));
+
+         Vector c = b.resize(42);
+         c.assign(3.14);
+         assertTrue(c.is(pi));
+
+         Vector d = c.resize(54);
+         d.assign(3.14);
+         assertTrue(d.is(pi));
+    }
+
+    public void testResize_32_to_110_to_1076_to_31() {
+
+        VectorPredicate fortyTwo = new VectorPredicate() {
+            @Override
+            public boolean test(int i, double value) {
+                return value == 42.0;
+            }
+        };
+
+        Vector a = factory().createVector();
+        Vector b = a.resize(32);
+
+        assertEquals(32, b.length());
+
+        b.assign(42.0);
+        assertTrue(b.is(fortyTwo));
+
+        Vector c = b.resize(110);
+        c.assign(42.0);
+        assertTrue(c.is(fortyTwo));
+
+        Vector d = c.resize(1076);
+        d.assign(42.0);
+        assertTrue(d.is(fortyTwo));
+
+        Vector e = d.resize(31);
+        e.assign(42.0);
+        assertTrue(e.is(fortyTwo));
+    }
 }

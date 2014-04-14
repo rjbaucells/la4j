@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013, by Vladimir Kostyukov and Contributors.
+ * Copyright 2011-2014, by Vladimir Kostyukov and Contributors.
  * 
  * This file is part of la4j project (http://la4j.org)
  * 
@@ -22,117 +22,146 @@
 package org.la4j.factory;
 
 import java.io.Serializable;
+import java.util.Random;
 
 import org.la4j.matrix.Matrix;
 import org.la4j.matrix.source.MatrixSource;
 import org.la4j.vector.Vector;
 import org.la4j.vector.source.VectorSource;
 
-public interface Factory extends Serializable {
+public abstract class Factory implements Serializable {
 
     /**
      * Creates an empty matrix.
-     * 
-     * <p>
-     * See <a href="http://mathworld.wolfram.com/Matrix.html">
-     * http://mathworld.wolfram.com/Matrix.html</a> for more details.
-     * </p>
-     * 
-     * @return empty matrix
+     *
+     * @return an empty matrix
      */
-    Matrix createMatrix();
+    public abstract Matrix createMatrix();
 
     /**
-     * Creates a matrix with specified size.
+     * Creates a matrix of specified shape.
      * 
-     * <p>
-     * See <a href="http://mathworld.wolfram.com/Matrix.html">
-     * http://mathworld.wolfram.com/Matrix.html</a> for more details.
-     * </p>
-     * @param rows
-     * @param columns
-     * @return
+     * @param rows the number of matrix rows
+     * @param columns the number of matrix columns
+     *
+     * @return a new matrix of given shape
      */
-    Matrix createMatrix(int rows, int columns);
+    public abstract Matrix createMatrix(int rows, int columns);
 
     /**
-     * Creates a matrix from array.
-     * 
-     * @param array
-     * @return
+     * Creates a matrix of specified shape.
+     *
+     * @param rows the number of matrix rows
+     * @param columns the number of matrix columns
+     * @param array the source 1D array
+     *
+     * @return a new matrix of given shape
      */
-    Matrix createMatrix(double array[][]);
+    public abstract Matrix createMatrix(int rows, int columns, double array[]);
 
     /**
-     * Creates a matrix from another matrix.
+     * Creates a matrix from given {@code array}.
      * 
-     * @param matrix
-     * @return
+     * @param array the source 2D array
+     *
+     * @return a new matrix of given array
      */
-    Matrix createMatrix(Matrix matrix);
+    public abstract Matrix createMatrix(double array[][]);
 
     /**
-     * Creates a matrix from matrix proxy.
+     * Creates a matrix from another {@code matrix}.
      * 
-     * @param source
-     * @return
+     * @param matrix the source matrix
+     *
+     * @return a new matrix
      */
-    Matrix createMatrix(MatrixSource source);
+    public abstract Matrix createMatrix(Matrix matrix);
 
     /**
-     * Creates the constant matrix 
+     * Creates a matrix from given matrix {@code source}.
      * 
-     * @param rows
-     * @param columns
-     * @return constant matrix
+     * @param source the matrix source
+     *
+     * @return a new matrix
      */
-    Matrix createConstantMatrix(int rows, int columns, double value);
+    public abstract Matrix createMatrix(MatrixSource source);
 
     /**
-     * Creates random matrix.
+     * Creates a constant matrix of given shape with {@code value} stored in
+     * each matrix cell.
      * 
-     * @param rows
-     * @param columns
-     * @return
+     * @param rows the number of matrix rows
+     * @param columns the number of matrix columns
+     *
+     * @return a constant matrix
      */
-    Matrix createRandomMatrix(int rows, int columns);
+    public abstract Matrix createConstantMatrix(int rows, int columns, double value);
 
     /**
-     * Creates random symmetric matrix.
+     * Creates a random matrix of given shape.
      * 
-     * @param size
-     * @return
+     * @param rows the number of matrix rows
+     * @param columns the number of matrix columns
+     *
+     * @return a random matrix
      */
-    Matrix createRandomSymmetricMatrix(int size);
+    public Matrix createRandomMatrix(int rows, int columns) {
+        return createRandomMatrix(rows, columns, new Random());
+    }
 
     /**
-     * Creates square matrix with specified size.
-     * 
-     * <p>
-     * See <a href="http://mathworld.wolfram.com/SquareMatrix.html">
-     * http://mathworld.wolfram.com/SquareMatrix.html</a> for more details.
-     * </p>
-     * 
-     * @param size
-     * @return
+     * Creates a random matrix of given shape.
+     *
+     * @param rows the number of matrix rows
+     * @param columns the number of matrix columns
+     * @param random the random object instance
+     *
+     * @return a random matrix
      */
-    Matrix createSquareMatrix(int size);
+    public abstract Matrix createRandomMatrix(int rows, int columns, Random random);
 
     /**
-     * Creates identity matrix.
+     * Creates a square random symmetric matrix of given {@code size}.
      * 
-     * <p>
-     * See <a href="http://mathworld.wolfram.com/IdentityMatrix.html">
-     * http://mathworld.wolfram.com/IdentityMatrix.html</a> for more details.
-     * </p>
-     * 
-     * @param size
-     * @return
+     * @param size the number of matrix rows/columns
+     *
+     * @return a square random symmetric matrix
      */
-    Matrix createIdentityMatrix(int size);
+    Matrix createRandomSymmetricMatrix(int size) {
+        return createRandomSymmetricMatrix(size, new Random());
+    }
 
     /**
-     * Creates matrix from given blocks.
+     * Creates a square random symmetric matrix of given {@code size}.
+     *
+     * @param size the number of matrix rows/columns
+     * @param random the random object instance
+     *
+     * @return a square random symmetric matrix
+     */
+    public abstract Matrix createRandomSymmetricMatrix(int size, Random random);
+
+    /**
+     * Creates a square matrix of given {@code size}.
+     * 
+     * @param size the number of matrix rows/columns
+     *
+     * @return a square matrix
+     */
+    public abstract Matrix createSquareMatrix(int size);
+
+    /**
+     * Creates an identity matrix of given {@code size}. An identity matrix
+     * contains {@code 1.0} at its main diagonal.
+     *
+     * @param size the number of matrix rows/columns
+     *
+     * @return an identity matrix
+     */
+    public abstract Matrix createIdentityMatrix(int size);
+
+    /**
+     * Creates a matrix from given blocks.
      * Throws IllegalArgumentException if sizes of blocks are incompatible.
      *
      * <p>
@@ -140,80 +169,96 @@ public interface Factory extends Serializable {
      * http://mathworld.wolfram.com/BlockMatrix.html</a> for more details.
      * </p>
      *
-     * @param a
-     * @param b
-     * @param c
-     * @param d
-     * @return Matrix created from blocks a, b, c, d.
+     * @param a the first block
+     * @param b the second block
+     * @param c the third block
+     * @param d the forth block
+     *
+     * @return a block matrix
      */
-    Matrix createBlockMatrix(Matrix a, Matrix b, Matrix c, Matrix d);
+    public abstract Matrix createBlockMatrix(Matrix a, Matrix b, Matrix c, Matrix d);
+
+    /**
+     * Creates a diagonal matrix of given {@code diagonal}.
+     *
+     * @param diagonal the matrix diagonal
+     *
+     * @return a diagonal matrix
+     */
+    public abstract Matrix createDiagonalMatrix(double diagonal[]);
 
     /**
      * Creates an empty vector.
      * 
-     * See <a href="http://mathworld.wolfram.com/Vector.html">
-     * http://mathworld.wolfram.com/Vector.html</a> for more details.
-     * </p>
-     * 
      * @return empty vector
      */
-    Vector createVector();
+    public abstract Vector createVector();
 
     /**
-     * Creates vector with specified length.
+     * Creates a vector of given {@code length}.
      * 
-     * @param length
-     * @return
+     * @param length the vector's length
+     *
+     * @return a new vector
      */
-    Vector createVector(int length);
+    public abstract Vector createVector(int length);
 
     /**
-     * Creates vector from array.
+     * Creates a vector from given {@code array}.
      * 
-     * @param array
-     * @return
+     * @param array the source 1D array
+     *
+     * @return a new vector
      */
-    Vector createVector(double array[]);
+    public abstract Vector createVector(double array[]);
 
     /**
+     * Creates a vector from another {@code vector}.
      * 
-     * @param vector
-     * @return
+     * @param vector the source vector
+     *
+     * @return a new vector
      */
-    Vector createVector(Vector vector);
+    public abstract Vector createVector(Vector vector);
 
     /**
+     * Creates a vector of given {@code source}.
      * 
-     * @param source
-     * @return
+     * @param source the vector source
+     *
+     * @return a new vector
      */
-    Vector createVector(VectorSource source);
+    public abstract Vector createVector(VectorSource source);
 
     /**
-     * Creates the constant vector.
+     * Creates a constant vector of given {@code length} and constant
+     * {@code value}.
      * 
-     * @param length
-     * @return constant vector
+     * @param length the vector's length
+     * @param value the constant value
+     *
+     * @return a constant vector
      */
-    Vector createConstantVector(int length, double value);
+    public abstract Vector createConstantVector(int length, double value);
 
     /**
-     * Creates random vector.
+     * Creates a random vector of given {@code length}.
      * 
-     * @param length
-     * @return
+     * @param length the vector's length
+     *
+     * @return a random vector
      */
-    Vector createRandomVector(int length);
+    public Vector createRandomVector(int length) {
+        return createRandomVector(length, new Random());
+    }
 
     /**
-     * 
-     * @return
+     * Creates a random vector of given {@code length}.
+     *
+     * @param length the vector's length
+     * @param random the random object instance
+     *
+     * @return a random vector
      */
-    Factory safe();
-
-    /**
-     * 
-     * @return
-     */
-    Factory unsafe();
+    public abstract Vector createRandomVector(int length, Random random);
 }

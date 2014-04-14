@@ -1,48 +1,45 @@
 /*
- * Copyright 2011-2013, by Vladimir Kostyukov and Contributors.
- * 
+ * Copyright 2011-2014, by Vladimir Kostyukov and Contributors.
+ *
  * This file is part of la4j project (http://la4j.org)
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * You may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  * Contributor(s): -
- * 
  */
 
-package org.la4j.matrix.source;
+package org.la4j.vector.builder;
 
-import org.la4j.matrix.Matrix;
+import org.la4j.vector.Vector;
 
-public class SafeMatrixSource implements MatrixSource {
+import java.util.Random;
 
-    private Matrix matrix;
+public class RandomSourcedVectorBuilder extends NonTerminalVectorBuilder {
 
-    public SafeMatrixSource(Matrix matrix) {
-        this.matrix = matrix.safe();
+    private Random random;
+
+    public RandomSourcedVectorBuilder(UnderlyingVectorBuilder underlying, Random random) {
+        super(underlying);
+        this.random = random;
     }
 
     @Override
-    public double get(int i, int j) {
-        return matrix.get(i, j);
+    public Vector build() {
+        return underlying.build(random);
     }
 
     @Override
-    public int columns() {
-        return matrix.columns();
-    }
-
-    @Override
-    public int rows() {
-        return matrix.rows();
+    public Vector build(int length) {
+        return underlying.build(length, random);
     }
 }

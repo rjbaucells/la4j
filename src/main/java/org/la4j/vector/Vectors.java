@@ -25,18 +25,22 @@ package org.la4j.vector;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Random;
 
 import org.la4j.LinearAlgebra;
+import org.la4j.factory.Factory;
 import org.la4j.io.MatrixMarketStream;
 import org.la4j.io.SymbolSeparatedStream;
+import org.la4j.vector.builder.TerminalVectorBuilder;
+import org.la4j.vector.builder.VectorBuilder;
 import org.la4j.vector.functor.VectorAccumulator;
 import org.la4j.vector.functor.VectorFunction;
 import org.la4j.vector.functor.VectorPredicate;
+import org.la4j.vector.functor.VectorProcedure;
 import org.la4j.vector.source.ArrayVectorSource;
+import org.la4j.vector.source.LoopbackVectorSource;
 import org.la4j.vector.source.RandomVectorSource;
-import org.la4j.vector.source.SafeVectorSource;
 import org.la4j.vector.source.StreamVectorSource;
-import org.la4j.vector.source.UnsafeVectorSource;
 import org.la4j.vector.source.VectorSource;
 
 public final class Vectors {
@@ -44,505 +48,510 @@ public final class Vectors {
     public static final double EPS = LinearAlgebra.EPS;
     public static final int ROUND_FACTOR = LinearAlgebra.ROUND_FACTOR;
 
-    private static class ZeroVectorPredicate implements VectorPredicate {
-        @Override
-        public boolean test(int i, double value) {
-            return Math.abs(value) < EPS;
-        }
-    }
-
-    private static class PositiveVectorPredicate implements VectorPredicate {
-        @Override
-        public boolean test(int i, double value) {
-            return value > 0;
-        }
-    }
-
-    private static class NegativeVectorPredicate implements VectorPredicate {
-        @Override
-        public boolean test(int i, double value) {
-            return value < 0;
-        }
-    }
-
-    private static class IncVectorFunction implements VectorFunction {
-        @Override
-        public double evaluate(int i, double value) {
-            return value + 1.0;
-        }
-    }
-
-    private static class DecVectorFunction implements VectorFunction {
-        @Override
-        public double evaluate(int i, double value) {
-            return value - 1.0;
-        }
-    }
-
-    private static class InvVectorFunction implements VectorFunction {
-        @Override
-        public double evaluate(int i, double value) {
-            return -value;
-        }
-    }
-
-    private static class PlusFunction implements VectorFunction {
-
-        private double arg;
-
-        public PlusFunction(double arg) {
-            this.arg = arg;
-        }
-
-        @Override
-        public double evaluate(int i, double value) {
-            return value + arg;
-        }
-    }
-
-    private static class MinusFunction implements VectorFunction {
-
-        private double arg;
-
-        public MinusFunction(double arg) {
-            this.arg = arg;
-        }
-
-        @Override
-        public double evaluate(int i, double value) {
-            return value - arg;
-        }
-    }
-
-    private static class MulFunction implements VectorFunction {
-
-        private double arg;
-
-        public MulFunction(double arg) {
-            this.arg = arg;
-        }
-
-        @Override
-        public double evaluate(int i, double value) {
-            return value * arg;
-        }
-    }
-
-    private static class DivFunction implements VectorFunction {
-
-        private double arg;
-
-        public DivFunction(double arg) {
-            this.arg = arg;
-        }
-
-        @Override
-        public double evaluate(int i, double value) {
-            return value / arg;
-        }
-    }
-
-    private static class ModFunction implements VectorFunction {
-
-        private double arg;
-
-        public ModFunction(double arg) {
-            this.arg = arg;
-        }
-
-        @Override
-        public double evaluate(int i, double value) {
-            return value % arg;
-        }
-    }
-
-    private static class SumVectorAccumulator implements VectorAccumulator {
-
-        private BigDecimal result;
-
-        public SumVectorAccumulator(double neutral) {
-            this.result = new BigDecimal(neutral);
-        }
-
-        @Override
-        public void update(int i, double value) {
-            result = result.add(new BigDecimal(value));
-        }
-
-        @Override
-        public double accumulate() {
-            return result.setScale(Vectors.ROUND_FACTOR, RoundingMode.CEILING).doubleValue();
-        }
-    }
-
-    private static class FunctionVectorAccumulator implements VectorAccumulator {
-
-        private VectorAccumulator accumulator;
-        private VectorFunction function;
-        
-        public FunctionVectorAccumulator(VectorAccumulator accumulator,
-                VectorFunction function) {
-
-            this.accumulator = accumulator;
-            this.function = function;
-        }
-
-        @Override
-        public void update(int i, double value) {
-            accumulator.update(i, function.evaluate(i, value));
-        }
-
-        @Override
-        public double accumulate() {
-            return accumulator.accumulate();
-        }
-    }
-
-    private static class ProductVectorAccumulator implements VectorAccumulator {
-
-        private BigDecimal result;
-
-        public ProductVectorAccumulator(double neutral) {
-            this.result = new BigDecimal(neutral);
-        }
-
-        @Override
-        public void update(int i, double value) {
-            result = result.multiply(new BigDecimal(value));
-        }
-
-        @Override
-        public double accumulate() {
-            return result.setScale(Vectors.ROUND_FACTOR, RoundingMode.CEILING).doubleValue();
-        }
-    }
-
-    public static interface NormFunction {
-
-        double compute(Vector vector);
-    }
-
-    private static class EuclideanNormFunction implements NormFunction {
-
-        @Override
-        public double compute(Vector vector) {
-            return Math.sqrt(vector.innerProduct(vector));
-        }
-    }
-
-    private static class ManhattanNormFunction implements NormFunction {
-
-        @Override
-        public double compute(Vector vector) {
-            double result = 0.0;
-
-            for (int i = 0; i < vector.length(); i++) {
-                result += Math.abs(vector.get(i));
-            }
-
-            return result;
-        }
-    }
-
-    public static class InfinityNormFunction implements NormFunction {
-
-        @Override
-        public double compute(Vector vector) {
-            double max = Math.abs(vector.get(0));
-
-            for (int i = 1; i < vector.length(); i++) {
-                double item = Math.abs(vector.get(i));
-                if (item > max) {
-                    max = item;
-                }
-            }
-
-            return max;
-        }
-    }
-
-    /**
-     * Creates a plus function with specified <code>value</code>. The function 
-     * evaluates like following: 
-     * <p>
-     * <center><code>something += value</code></center>
-     * </p>
-     * 
-     * @param value
-     * @return
-     */
-    public static VectorFunction asPlusFunction(double value) {
-        return new PlusFunction(value);
-    }
-
-    /**
-     * Creates a minus function with specified <code>value</code>. The function 
-     * evaluates like following: 
-     * <p>
-     * <center><code>something -= value</code></center>
-     * </p> 
-     * 
-     * @param value
-     * @return
-     */
-    public static VectorFunction asMinusFunction(double value) {
-        return new MinusFunction(value);
-    }
-
-    /**
-     * Creates a multiply function with specified <code>value</code>. The 
-     * function evaluates like following: 
-     * <p>
-     * <center><code>something *= value</code></center>
-     * </p>
-     * 
-     * @param value
-     * @return
-     */
-    public static VectorFunction asMulFunction(double value) {
-        return new MulFunction(value);
-    }
-
-    /**
-     * Creates a divide function with specified <code>value</code>. The function 
-     * evaluates like following: 
-     * <p>
-     * <center><code>something /= value</code></center>
-     * </p>
-     * 
-     * @param value
-     * @return
-     */
-    public static VectorFunction asDivFunction(double value) {
-        return new DivFunction(value);
-    }
-
-    /**
-     * Creates a modulus function with specified <code>value</code>. The function 
-     * evaluates like following:
-     * <p>
-     * <center><code>something %= value</code></center>
-     * </p>
-     *
-     * @param value
-     * @return
-     */
-    public static VectorFunction asModFunction(double value) {
-        return new ModFunction(value);
-    }
-
     /**
      * Checks whether the vector is a
      * <a href="http://mathworld.wolfram.com/ZeroMatrix.html">zero
      * vector</a>.
      */
-    public static final VectorPredicate ZERO_VECTOR =
-            new ZeroVectorPredicate();
+    public static final VectorPredicate ZERO_VECTOR = new VectorPredicate() {
+        @Override
+        public boolean test(int i, double value) {
+            return Math.abs(value) < EPS;
+        }
+    };
 
     /**
-     * Checks whether the vector is a 
-     * <a href="http://mathworld.wolfram.com/PositiveMatrix.html">positive 
+     * Checks whether the vector is a
+     * <a href="http://mathworld.wolfram.com/PositiveMatrix.html">positive
      * vector</a>.
      */
-    public static final VectorPredicate POSITIVE_VECTOR =
-            new PositiveVectorPredicate();
+    public static final VectorPredicate POSITIVE_VECTOR = new VectorPredicate() {
+        @Override
+        public boolean test(int i, double value) {
+            return value > 0.0;
+        }
+    };
 
     /**
-     * Checks whether the vector is a 
-     * <a href="http://mathworld.wolfram.com/NegativeMatrix.html">negative 
+     * Checks whether the vector is a
+     * <a href="http://mathworld.wolfram.com/NegativeMatrix.html">negative
      * vector</a>.
      */
-    public static final VectorPredicate NEGATIVE_VECTOR = 
-            new NegativeVectorPredicate();
+    public static final VectorPredicate NEGATIVE_VECTOR = new VectorPredicate() {
+        @Override
+        public boolean test(int i, double value) {
+            return value < 0.0;
+        }
+    };
 
-     /**
+    /**
      * Increases each element of vector by <code>1</code>.
      */
-    public static final VectorFunction INC_FUNCTION = new IncVectorFunction();
+    public static final VectorFunction INC_FUNCTION = new VectorFunction() {
+        @Override
+        public double evaluate(int i, double value) {
+            return value + 1.0;
+        }
+    };
 
     /**
      * Decreases each element of vectors by <code>1</code>.
      */
-    public static final VectorFunction DEC_FUNCTION = new DecVectorFunction();
+    public static final VectorFunction DEC_FUNCTION = new VectorFunction() {
+        @Override
+        public double evaluate(int i, double value) {
+            return value - 1.0;
+        }
+    };
 
     /**
      * Inverts each element of vector.
      */
-    public static final VectorFunction INV_FUNCTION = new InvVectorFunction();
+    public static final VectorFunction INV_FUNCTION = new VectorFunction() {
+        @Override
+        public double evaluate(int i, double value) {
+            return -value;
+        }
+    };
 
     /**
-     * Calculates the Euclidean norm of a vector.
+     * Creates a const function that evaluates it's argument to given {@code value}.
+     *
+     * @param arg a const value
+     *
+     * @return a closure object that does {@code _}
      */
-    public static final NormFunction EUCLIDEAN_NORM = new EuclideanNormFunction();
-
-    /**
-     * Calculates the Manhattan norm of a vector.
-     */
-    public static final NormFunction MANHATTAN_NORM = new ManhattanNormFunction();
-
-    /**
-     * Calculates the Maximum norm of a vector.
-     */
-    public static final NormFunction INFINITY_NORM = new InfinityNormFunction();
-
-    /**
-     * Creates a singleton 1-length vector from <code>value</code>.
-     * 
-     * @param value
-     * @return
-     */
-    public static Vector asSingletonVector(double value) {
-        return LinearAlgebra.DEFAULT_FACTORY.createVector(new double[] { value });
+    public static VectorFunction asConstFunction(final double arg) {
+        return new VectorFunction() {
+            @Override
+            public double evaluate(int i, double value) {
+                return arg;
+            }
+        };
     }
 
     /**
-     * Wraps the <code>vector</code> with interface that provides safe accessors
-     * and modifiers.
-     * 
-     * @param vector
-     * @return
+     * Creates a plus function that adds given {@code value} to it's argument.
+     *
+     * @param arg a value to be added to function's argument
+     *
+     * @return a closure object that does {@code _ + _}
      */
-    public static Vector asSafeVector(Vector vector) {
-        return vector.safe();
+    public static VectorFunction asPlusFunction(final double arg) {
+        return new VectorFunction() {
+            @Override
+            public double evaluate(int i, double value) {
+                return value + arg;
+            }
+        };
     }
 
     /**
-     * Unwraps the safe <code>vector</code>.
-     * 
-     * @param vector
-     * @return
+     * Creates a minus function that subtracts given {@code value} from it's argument.
+     *
+     * @param arg a value to be subtracted from function's argument
+     *
+     * @return a closure that does {@code _ - _}
      */
-    public static Vector asUnsafeVector(Vector vector) {
-        return vector.unsafe();
+    public static VectorFunction asMinusFunction(final double arg) {
+        return new VectorFunction() {
+            @Override
+            public double evaluate(int i, double value) {
+                return value - arg;
+            }
+        };
     }
 
     /**
-     * Creates a safe vector source with specified <code>vector</code>.
-     * 
-     * @param vector
-     * @return
+     * Creates a mul function that multiplies given {@code value} by it's argument.
+     *
+     * @param arg a value to be multiplied by function's argument
+     *
+     * @return a closure that does {@code _ * _}
      */
-    public static VectorSource asSafeSource(Vector vector) {
-        return new SafeVectorSource(vector);
+    public static VectorFunction asMulFunction(final double arg) {
+        return new VectorFunction() {
+            @Override
+            public double evaluate(int i, double value) {
+                return value * arg;
+            }
+        };
     }
 
     /**
-     * Creates a unsafe vector source with specified <code>vector</code>.
-     * 
-     * @param vector
-     * @return
+     * Creates a div function that divides it's argument by given {@code value}.
+     *
+     * @param arg a divisor value
+     *
+     * @return a closure that does {@code _ / _}
      */
-    public static VectorSource asUnsafeSource(Vector vector) {
-        return new UnsafeVectorSource(vector);
+    public static VectorFunction asDivFunction(final double arg) {
+        return new VectorFunction() {
+            @Override
+            public double evaluate(int i, double value) {
+                return value / arg;
+            }
+        };
     }
 
     /**
-     * Creates an array vector source with specified <code>array</code> 
-     * reference.
+     * Creates a mod function that calculates the modulus of it's argument and given {@code value}.
+     *
+     * @param arg a divisor value
+     *
+     * @return a closure that does {@code _ % _}
+     */
+    public static VectorFunction asModFunction(final double arg) {
+        return new VectorFunction() {
+            @Override
+            public double evaluate(int i, double value) {
+                return value % arg;
+            }
+        };
+    }
+
+    /**
+     * Creates a sum vector accumulator that calculates the sum of all elements in the vector.
+     *
+     * @param neutral the neutral value
+     *
+     * @return a sum accumulator
+     */
+    public static VectorAccumulator asSumAccumulator(final double neutral) {
+        return new VectorAccumulator() {
+            private BigDecimal result = new BigDecimal(neutral);
+
+            @Override
+            public void update(int i, double value) {
+                result = result.add(new BigDecimal(value));
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result.setScale(Vectors.ROUND_FACTOR, RoundingMode.CEILING).doubleValue();
+                result = new BigDecimal(neutral);
+                return value;
+            }
+        };
+    }
+
+    /**
+     * Creates a product vector accumulator that calculates the product of all elements in the vector.
+     *
+     * @param neutral the neutral value
+     *
+     * @return a product accumulator
+     */
+    public static VectorAccumulator asProductAccumulator(final double neutral) {
+        return new VectorAccumulator() {
+            private BigDecimal result = new BigDecimal(neutral);
+
+            @Override
+            public void update(int i, double value) {
+                result = result.multiply(new BigDecimal(value));
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result.setScale(Vectors.ROUND_FACTOR, RoundingMode.CEILING).doubleValue();
+                result = new BigDecimal(neutral);
+                return value;
+            }
+        };
+    }
+
+    /**
+     * Makes a minimum vector accumulator that accumulates the minimum across vector elements.
+     *
+     * @return a minimum vector accumulator
+     */
+    public static VectorAccumulator mkMinAccumulator() {
+        return new VectorAccumulator() {
+            private double result = Double.POSITIVE_INFINITY;
+
+            @Override
+            public void update(int i, double value) {
+                result = Math.min(result, value);
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result;
+                result = Double.POSITIVE_INFINITY;
+                return value;
+            }
+        };
+    }
+
+    /**
+     * Makes a maximum vector accumulator that accumulates the maximum across vector elements.
+     *
+     * @return a maximum vector accumulator
+     */
+    public static VectorAccumulator mkMaxAccumulator() {
+        return new VectorAccumulator() {
+            private double result = Double.NEGATIVE_INFINITY;
+
+            @Override
+            public void update(int i, double value) {
+                result = Math.max(result, value);
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result;
+                result = Double.NEGATIVE_INFINITY;
+                return value;
+            }
+        };
+    }
+
+    /**
+     * Makes an Euclidean norm accumulator that allows to use
+     * {@link Vector#fold(org.la4j.vector.functor.VectorAccumulator)} method for norm calculation.
+     *
+     * @return an Euclidean norm accumulator
+     */
+    public static VectorAccumulator mkEuclideanNormAccumulator() {
+        return new VectorAccumulator() {
+            private BigDecimal result = new BigDecimal(0.0);
+
+            @Override
+            public void update(int i, double value) {
+                result = result.add(new BigDecimal(value * value));
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result.setScale(Vectors.ROUND_FACTOR, RoundingMode.CEILING).doubleValue();
+                result = new BigDecimal(0.0);
+                return Math.sqrt(value);
+            }
+        };
+    }
+
+    /**
+     * Makes a Manhattan norm accumulator that allows to use
+     * {@link Vector#fold(org.la4j.vector.functor.VectorAccumulator)} method for norm calculation.
+     *
+     * @return a Manhattan norm accumulator
+     */
+    public static VectorAccumulator mkManhattanNormAccumulator() {
+        return new VectorAccumulator() {
+            private double result = 0.0;
+
+            @Override
+            public void update(int i, double value) {
+                result += Math.abs(value);
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result;
+                result = 0.0;
+                return value;
+            }
+        };
+    }
+
+    /**
+     * Makes an Infinity norm accumulator that allows to use
+     * {@link Vector#fold(org.la4j.vector.functor.VectorAccumulator)} method for norm calculation.
+     *
+     * @return an Infinity norm accumulator
+     */
+    public static VectorAccumulator mkInfinityNormAccumulator() {
+        return new VectorAccumulator() {
+            private double result = Double.NEGATIVE_INFINITY;
+
+            @Override
+            public void update(int i, double value) {
+                result = Math.max(result, Math.abs(value));
+            }
+
+            @Override
+            public double accumulate() {
+                double value = result;
+                result = Double.NEGATIVE_INFINITY;
+                return value;
+            }
+        };
+    }
+
+    /**
+     * Creates a sum function accumulator, that calculates the sum of all
+     * elements in the vector after applying given {@code function} to each of them.
+     *
+     * @param neutral the neutral value
+     * @param function the vector function
+     *
+     * @return a sum function accumulator
+     */
+    public static VectorAccumulator asSumFunctionAccumulator(final double neutral,
+                                                             final VectorFunction function) {
+        return new VectorAccumulator() {
+            private VectorAccumulator sumAccumulator = Vectors.asSumAccumulator(neutral);
+
+            @Override
+            public void update(int i, double value) {
+                sumAccumulator.update(i, function.evaluate(i, value));
+            }
+
+            @Override
+            public double accumulate() {
+                return sumAccumulator.accumulate();
+            }
+        };
+    }
+
+    /**
+     * Creates a product function accumulator, that calculates the product of
+     * all elements in the vector after applying given {@code function} to
+     * each of them.
+     *
+     * @param neutral the neutral value
+     * @param function the vector function
+     *
+     * @return a product function accumulator
+     */
+    public static VectorAccumulator asProductFunctionAccumulator(final double neutral,
+                                                                 final VectorFunction function) {
+        return new VectorAccumulator() {
+            private VectorAccumulator productAccumulator = Vectors.asProductAccumulator(neutral);
+
+            @Override
+            public void update(int i, double value) {
+                productAccumulator.update(i, function.evaluate(i, value));
+            }
+
+            @Override
+            public double accumulate() {
+                return productAccumulator.accumulate();
+            }
+        };
+    }
+
+    /**
+     * Creates an accumulator procedure that adapts a vector accumulator for procedure
+     * interface. This is useful for reusing a single accumulator for multiple fold operations
+     * in multiple vectors.
+     *
+     * @param accumulator the vector accumulator
+     *
+     * @return an accumulator procedure
+     */
+    public static VectorProcedure asAccumulatorProcedure(final VectorAccumulator accumulator) {
+        return new VectorProcedure() {
+            @Override
+            public void apply(int i, double value) {
+                accumulator.update(i, value);
+            }
+        };
+    }
+
+    /**
+     * Creates a vector source of given {@code vector}.
      * 
-     * @param array
-     * @return
+     * @param vector the source vector
+     *
+     * @return a vector source
+     */
+    public static VectorSource asVectorSource(Vector vector) {
+        return new LoopbackVectorSource(vector);
+    }
+
+    /**
+     * Creates an array vector source of given array {@code reference}.
+     * 
+     * @param array the source array
+     *
+     * @return an array vector source
      */
     public static VectorSource asArraySource(double[] array) {
         return new ArrayVectorSource(array);
     }
 
     /**
-     * Creates a random vector source with specified <code>length</code>.
+     * Creates a random vector source of given {@code length}.
      * 
-     * @param length
-     * @return
+     * @param length the length of the source
+     *
+     * @return a random vector source
      */
-    public static VectorSource asRandomSource(int length) {
-        return new RandomVectorSource(length);
+    public static VectorSource asRandomSource(int length, Random random) {
+        return new RandomVectorSource(length, random);
     }
 
     /**
-     * Creates a MatrixMarket stream source with specified input stream.
+     * Creates a MatrixMarket stream source of given input stream {@code in}.
      * 
-     * @param in
-     * @return
+     * @param in the input stream
+     *
+     * @return a MatrixMarket stream source
      */
+    @Deprecated
     public static VectorSource asMatrixMarketSource(InputStream in) {
         return new StreamVectorSource(new MatrixMarketStream(in));
     }
 
     /**
-     * Creates a symbol separated stream source (like CSV) with specified
-     * input stream.
-     * 
-     * @param in
-     * @return
+     * Creates a symbol separated stream source (like CSV) of given input stream {@code in}.
+     *
+     * @param in the input stream
+     *
+     * @return a symbol separated stream source
      */
+    @Deprecated
     public static VectorSource asSymbolSeparatedSource(InputStream in) {
         return new StreamVectorSource(new SymbolSeparatedStream(in));
     }
 
     /**
-     * Creates a symbol separated stream source (like CSV) with specified
-     * input stream and <code>separator</code>.
-     * 
-     * @param in
-     * @param separator
-     * @return
+     * Creates a symbol separated stream source (like CSV) of given input stream {@code in}.
+     *
+     * @param in the input stream
+     * @param separator the values' separator
+     *
+     * @return a symbol separated stream source
      */
-    public static VectorSource asSymbolSeparatedSource(InputStream in, 
-            String separator) {
-
+    @Deprecated
+    public static VectorSource asSymbolSeparatedSource(InputStream in, String separator) {
         return new StreamVectorSource(new SymbolSeparatedStream(in, separator));
     }
 
     /**
-     * Creates a sum vector accumulator, that calculates the sum of all 
-     * elements of vector.
-     * 
-     * @param neutral
-     * @return
+     * Creates a new vector builder instance of given {@code factory}.
+     *
+     * @param factory the builder's factory
+     *
+     * @return a factorised vector builder
      */
-    public static VectorAccumulator asSumAccumulator(double neutral) {
-        return new SumVectorAccumulator(neutral);
+    public static VectorBuilder asBuilder(Factory factory) {
+        return new TerminalVectorBuilder(factory);
     }
 
     /**
-     * Creates a product vector accumulator, that calculates the product of all
-     * elements of vector.
-     * 
-     * @param neutral
-     * @return
+     * Creates a singleton 1-length vector of given {@code value}.
+     *
+     * This method is deprecated. Use the {@link org.la4j.vector.Vectors#asVector(double...)}
+     *
+     * @param value the vector's singleton value
+     *
+     * @return a singleton vector
      */
-    public static VectorAccumulator asProductAccumulator(double neutral) {
-        return new ProductVectorAccumulator(neutral);
+    @Deprecated
+    public static Vector asSingletonVector(double value) {
+        return LinearAlgebra.DEFAULT_FACTORY.createVector(new double[]{value});
     }
 
     /**
-     * Creates a sum function accumulator, that calculates the sum of all 
-     * elements of vector after applying a <code>function</code> to 
-     * each of them.
-     * 
-     * @param neutral
-     * @param function
-     * @return
+     * Creates a default vector from given vararg {@code values}.
+     *
+     * @param values of the vector
+     *
+     * @return a default vector
      */
-    public static VectorAccumulator asSumFunctionAccumulator(double neutral, 
-            VectorFunction function) {
-
-        return new FunctionVectorAccumulator(new SumVectorAccumulator(neutral), 
-                                             function);
-    }
-
-    /**
-     * Creates a produce function accumulator, that calculates the produce of
-     * all elements of matrix after applying a <code>function</code> to
-     * each of them.
-     * 
-     * @param neutral
-     * @param function
-     * @return
-     */
-    public static VectorAccumulator asProductFunctionAccumulator(double neutral, 
-            VectorFunction function) {
-
-        return new FunctionVectorAccumulator(new ProductVectorAccumulator(neutral),
-                                             function);
+    public static Vector asVector(double... values) {
+        return LinearAlgebra.DEFAULT_FACTORY.createVector(values);
     }
 }

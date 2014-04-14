@@ -30,7 +30,7 @@ import org.la4j.matrix.Matrix;
 import org.la4j.matrix.source.MatrixSource;
 import org.la4j.matrix.sparse.CRSMatrix;
 
-public class CRSFactory extends CompressedFactory implements Factory {
+public class CRSFactory extends CompressedFactory {
 
     private static final long serialVersionUID = 4071505L;
 
@@ -42,6 +42,11 @@ public class CRSFactory extends CompressedFactory implements Factory {
     @Override
     public Matrix createMatrix(int rows, int columns) {
         return new CRSMatrix(rows, columns);
+    }
+
+    @Override
+    public Matrix createMatrix(int rows, int columns, double[] array) {
+        return new CRSMatrix(rows, columns, array);
     }
 
     @Override
@@ -83,11 +88,9 @@ public class CRSFactory extends CompressedFactory implements Factory {
     }
 
     @Override
-    public Matrix createRandomMatrix(int rows, int columns) {
+    public Matrix createRandomMatrix(int rows, int columns, Random random) {
 
-        Random random = new Random();
-
-        int cardinality = (rows * columns) / DENSITY;
+        int cardinality = Math.max((rows * columns) / DENSITY, rows);
 
         double values[] = new double[cardinality];
         int columnIndices[] = new int[cardinality];
@@ -127,13 +130,11 @@ public class CRSFactory extends CompressedFactory implements Factory {
     }
 
     @Override
-    public Matrix createRandomSymmetricMatrix(int size) {
+    public Matrix createRandomSymmetricMatrix(int size, Random random) {
 
         // TODO: Issue 15
 
         int cardinality = (size * size) / DENSITY;
-
-        Random random = new Random();
 
         Matrix matrix = new CRSMatrix(size, size, cardinality);
 
@@ -157,20 +158,10 @@ public class CRSFactory extends CompressedFactory implements Factory {
     @Override
     public Matrix createIdentityMatrix(int size) {
 
-        double values[] = new double[size];
-        int columnIndices[] = new int[size];
-        int rowPointers[] = new int[size + 1];
+        double diagonal[] = new double[size];
+        Arrays.fill(diagonal, 1.0);
 
-        for (int i = 0; i < size; i++) {
-            values[i] = 1.0;
-            columnIndices[i] = i;
-            rowPointers[i] = i;
-        }
-
-        rowPointers[size] = size;
-
-        return new CRSMatrix(size, size, size, values, columnIndices,
-                             rowPointers);
+        return createDiagonalMatrix(diagonal);
     }
 
     @Override
@@ -220,4 +211,20 @@ public class CRSFactory extends CompressedFactory implements Factory {
         return new CRSMatrix(rows, cols, k, valuesArray, colIndArray, rowPointers);
     }
 
+    @Override
+    public Matrix createDiagonalMatrix(double[] diagonal) {
+
+        int size = diagonal.length;
+        int columnIndices[] = new int[size];
+        int rowPointers[] = new int[size + 1];
+
+        for (int i = 0; i < size; i++) {
+            columnIndices[i] = i;
+            rowPointers[i] = i;
+        }
+
+        rowPointers[size] = size;
+
+        return new CRSMatrix(size, size, size, diagonal, columnIndices, rowPointers);
+    }
 }

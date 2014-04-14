@@ -2,10 +2,10 @@
 =============================
 ![la4j logo](https://raw.github.com/vkostyukov/la4j/master/la4j-logo.png) 
 
-The [**la4j**](http://la4j.org) is open source and **100% Java** library 
-that provides **Linear Algebra** primitives (matrices and vectors) and algorithms. The **la4j** was initially designed 
-to be lightweight and simple tool for passionate Java developers. It has been started as student project and turned into
-one of the most popular Java packages for matrices and vectors.
+The [**la4j**](http://la4j.org) is an open source and **100% Java** library
+that provides **Linear Algebra** primitives (matrices and vectors) and algorithms. The **la4j** library was initially
+designed to be a lightweight and simple tool for passionate Java developers. It has been started as student project
+and turned into one of the most popular Java packages for matrices and vectors.
 
 The key features of the **la4j** are listed bellow:
 
@@ -13,17 +13,47 @@ The key features of the **la4j** are listed bellow:
 * No dependencies and tiny size (~150kb jar)
 * Fluent and object-oriented/functional API
 * Sparse (CRS, CCS) and dense (1D/2D arrays) matrices and vectors
-* Linear systems solving (Gaussian, Jacobi, Zeidel, Square Root, Sweep and other)
+* Linear systems solving (Gaussian, Jacobi, Seidel, Square Root, Sweep and other)
 * Matrices decomposition (Eigenvalues/Eigenvectors, SVD, QR, LU, Cholesky and other)
 * Functors support: predicates, functions, procedures and accumulators
 * MatrixMarket/CSV IO formats support
 
 
-Brief Examples
---------------
+Samples
+-------
+**Building the matrix**
+```java
+// We will use a CRS (Compressed Row Storage) matrix builder
+// We will use a 2D array matrix builder
+Matrix b = Matrices.asBuilder(LinearAlgebra.BASIC2D_FACTORY)
+           .shape(25, 25)    // We want a 25x25 matrix
+           .source(3.14)     // ... with all the elements equal '3.14'
+           .buildDiagonal(); // ... and it should be a diagonal matrix
+
+// We wil use a CCS (Compressed Column Storage) matrix builder
+Matrix c = Matrices.asBuilder(LinearAlgebra.CCS_FACTORY)
+           .shape(14, 14)         // We want a 14x14 matrix
+           .source(new Random())  // ... with random elements
+           .buildSymmetric();     // ... and it should be a symmetric matrix
+```
+
+**Building the vector**
+```java
+// We will use a dense vector builder
+Vector a = Vectors.asBuilder(LinearAlgebra.DENSE_FACTORY)
+           .length(10)            // We want 10 elements vector
+           .source(new Random())  // ... with random values
+           .build();
+
+Vector a = Vectors.asBuilder(LinearAlgebra.DENSE_FACTORY)
+           .length(10)                    // We want 10 elements vector
+           .source(new double[] { 1.0 })  // ... with the values from an array
+           .build();                      // ... and it should be extended to a requested size
+```
+
 **Matrix inversion**
 ```java
-// We want simple dense matrix that uses 2D array as internal representation
+// We want a simple dense matrix that uses 2D array as internal representation
 Matrix a = new Basic2DMatrix(new double[][] {
    { 1.0, 2.0, 3.0 },
    { 4.0, 5.0, 6.0 },
@@ -33,11 +63,11 @@ Matrix a = new Basic2DMatrix(new double[][] {
 // We will use Gauss-Jordan method for inverting
 MatrixInverter inverter = a.withInverter(LinearAlgebra.GAUSS_JORDAN);
 // The 'b' matrix will be dense
-Matrix b = inverter.invert(LinearAlgebra.DENSE_FACTORY);
+Matrix b = inverter.inverse(LinearAlgebra.DENSE_FACTORY);
 ```
 **System of linear equations**
 ```java
-// The coefficient matrix 'a' is a CRS (Compressed Sparse Row) matrix 
+// The coefficient matrix 'a' is a CRS (Compressed Row Storage) matrix
 Matrix a = new CRSMatrix(new double[][] {
    { 1.0, 2.0, 3.0 },
    { 4.0, 5.0, 6.0 },
@@ -57,7 +87,7 @@ Vector x = solver.solve(b, LinearAlgebra.SPARSE_FACTORY);
 ```
 **Matrix decomposition**
 ```java
-// We want simple dense matrix, which is based on 1D double's array 
+// We want simple dense matrix, which is based on 1D double array
 Matrix a = new Basic1DMatrix(new double[][] {
    { 1.0, 2.0, 3.0 },
    { 4.0, 5.0, 6.0 },
@@ -69,6 +99,12 @@ MatrixDecompositor decompositor = a.withDecompositor(LinearAlgebra.LU);
 // The result should be treated as: L = lup[0], U = lup[1], P = lup[2]
 Matrix[] lup = decompositor.decompose(LinearAlgebra.DENSE_FACTORY);
 ```
+
+Changelog
+------------
+
+See [CHANGELOG.md](https://github.com/vkostyukov/la4j/blob/master/CHANGELOG.md)
+
 
 Download
 --------
@@ -96,26 +132,10 @@ How To Contribute
 Contributors
 ------------
 
-The [**la4j**](http://la4j.org) wouldn't be the library it is today without the source contributions 
-made by the authors:
-- Wajdy Essam
-- Evgenia Krivova
-- Julia Kostyukova
-- Alessio Placitelli
-- Pavel Kalaidin
-- Chandler May
-- Daniel Renshaw
-- Ewald Grusk
-- Jakob Moellers
-- Iurii Drozd
-- Maxim Samoylov
-- Phil Messenger
-- Anveshi Charuvaka
-- Clement Skau
-- Miron Aseev
+See [CONTRIBUTORS.md](https://github.com/vkostyukov/la4j/blob/master/CONTRIBUTORS.md)
 
 ----
-by [Vladimir Kostyukov](http://vkostyukov.ru), 2011-2013
+by [Vladimir Kostyukov](http://vkostyukov.ru), 2011-2014
 
 
 [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/vkostyukov/la4j/trend.png)](https://bitdeli.com/free "Bitdeli Badge")

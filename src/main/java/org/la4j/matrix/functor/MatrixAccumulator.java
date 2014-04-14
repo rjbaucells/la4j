@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013, by Vladimir Kostyukov and Contributors.
+ * Copyright 2011-2014, by Vladimir Kostyukov and Contributors.
  * 
  * This file is part of la4j project (http://la4j.org)
  * 
@@ -21,24 +21,24 @@
 
 package org.la4j.matrix.functor;
 
+/**
+ * A matrix accumulator that accumulates elements across matrix.
+ */
 public interface MatrixAccumulator {
 
     /**
+     * Updates a value that was accumulated so far with new matrix element.
      * 
-     * @param row
-     * @param col
-     * @param value
+     * @param i the row index
+     * @param j the column index
+     * @param value the element's value
      */
-    void update(int row, int col, double value);
+    void update(int i, int j, double value);
 
     /**
-     * 
-     * @return
+     * Return the accumulated value and resets this accumulator.
+     *
+     * @return an accumulated value
      */
     double accumulate();
-    
-    /**
-     * Reset the accumulator state
-     */
-    void reset();
 }

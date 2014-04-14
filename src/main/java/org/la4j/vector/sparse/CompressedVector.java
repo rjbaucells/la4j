@@ -31,6 +31,7 @@ import org.la4j.LinearAlgebra;
 import org.la4j.vector.AbstractVector;
 import org.la4j.vector.Vector;
 import org.la4j.vector.Vectors;
+import org.la4j.vector.functor.VectorAccumulator;
 import org.la4j.vector.functor.VectorFunction;
 import org.la4j.vector.functor.VectorProcedure;
 import org.la4j.vector.source.VectorSource;
@@ -55,7 +56,7 @@ public class CompressedVector extends AbstractVector implements SparseVector {
     }
 
     public CompressedVector(Vector vector) {
-        this(Vectors.asUnsafeSource(vector));
+        this(Vectors.asVectorSource(vector));
     }
 
     public CompressedVector(double array[]) {
@@ -102,20 +103,25 @@ public class CompressedVector extends AbstractVector implements SparseVector {
 
     @Override
     public double get(int i) {
+        return getOrElse(i, 0.0);
+    }
 
-        int k = searchForIndex(i, 0, cardinality);
+    @Override
+    public double getOrElse(int i, double defaultValue) {
+
+        int k = searchForIndex(i);
 
         if (k < cardinality && indices[k] == i) {
             return values[k];
         }
 
-        return 0.0;
+        return defaultValue;
     }
 
     @Override
     public void set(int i, double value) {
 
-        int k = searchForIndex(i, 0, cardinality);
+        int k = searchForIndex(i);
 
         if (k < cardinality && indices[k] == i) {
             // if (Math.abs(value) > Vectors.EPS || value < 0.0) {
@@ -136,8 +142,8 @@ public class CompressedVector extends AbstractVector implements SparseVector {
             return;
         }
 
-        int ii = searchForIndex(i, 0, cardinality);
-        int jj = searchForIndex(j, 0, cardinality);
+        int ii = searchForIndex(i);
+        int jj = searchForIndex(j);
 
         boolean iiNotZero = ii < cardinality && i == indices[ii];
         boolean jjNotZero = jj < cardinality && j == indices[jj];
@@ -211,25 +217,14 @@ public class CompressedVector extends AbstractVector implements SparseVector {
     public Vector resize(int length) {
         ensureLengthIsCorrect(length);
 
-        int $cardinality = 0;
-        double $values[] = new double[align(length, 0)];
-        int $indices[] = new int[align(length, 0)];
+        int $cardinality = (length > this.length) ?
+                           cardinality : searchForIndex(length);
 
-        if (length >= this.length) {
+        double $values[] = new double[align(length, $cardinality)];
+        int $indices[] = new int[align(length, $cardinality)];
 
-            $cardinality = cardinality; 
-            System.arraycopy(values, 0, $values, 0, cardinality);
-            System.arraycopy(indices, 0, $indices, 0, cardinality);
-
-        } else {
-
-            $cardinality = searchForIndex(length, 0, cardinality);
-            for (int i = 0; i < $cardinality; i++) {
-                $values[i] = values[i];
-                $indices[i] = indices[i];
-            }
-
-        }
+        System.arraycopy(values, 0, $values, 0, $cardinality);
+        System.arraycopy(indices, 0, $indices, 0, $cardinality);
 
         return new CompressedVector(length, $cardinality, $values, $indices);
     }
@@ -251,7 +246,7 @@ public class CompressedVector extends AbstractVector implements SparseVector {
     @Override
     public void update(int i, VectorFunction function) {
 
-        int k = searchForIndex(i, 0, cardinality);
+        int k = searchForIndex(i);
 
         if (k < cardinality && indices[k] == i) {
 
@@ -266,11 +261,6 @@ public class CompressedVector extends AbstractVector implements SparseVector {
         } else {
             insert(k, i, function.evaluate(i, 0.0));
         }
-    }
-
-    @Override
-    public Vector safe() {
-        return new SparseSafeVector(this);
     }
 
     @Override
@@ -303,31 +293,40 @@ public class CompressedVector extends AbstractVector implements SparseVector {
         }
     }
 
-    private int searchForIndex(int i, int left, int right) {
+    @Override
+    public boolean isZeroAt(int i) {
+        return !nonZeroAt(i);
+    }
 
-        if (left == right) {
-            return left;
-        }
+    @Override
+    public boolean nonZeroAt(int i) {
+        int k = searchForIndex(i);
+        return k < cardinality && indices[k] == i;
+    }
 
-        if (right - left < 8) {
+    @Override
+    public double foldNonZero(VectorAccumulator accumulator) {
+        eachNonZero(Vectors.asAccumulatorProcedure(accumulator));
+        return accumulator.accumulate();
+    }
 
-            int ii = left;
-            while (ii < right && indices[ii] < i) {
-                ii++;
+    private int searchForIndex(int i) {
+
+        int left = 0;
+        int right = cardinality;
+
+        while (left < right) {
+            int p = (left + right) / 2;
+            if (indices[p] > i) {
+                right = p;
+            } else if (indices[p] < i) {
+                left = p + 1;
+            } else {
+                return p;
             }
-
-            return ii;
         }
 
-        int p = (left + right) / 2;
-
-        if (indices[p] > i) {
-            return searchForIndex(i, left, p);
-        } else if (indices[p] < i) {
-            return searchForIndex(i, p + 1, right);
-        } else {
-            return p;
-        }
+        return left;
     }
 
     private void insert(int k, int i, double value) {

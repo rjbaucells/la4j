@@ -25,6 +25,8 @@
 
 package org.la4j.vector;
 
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.Random;
 
 import org.la4j.factory.Factory;
@@ -36,6 +38,9 @@ import org.la4j.vector.functor.VectorPredicate;
 import org.la4j.vector.functor.VectorProcedure;
 
 public abstract class AbstractVector implements Vector {
+
+    private static final String DEFAULT_DELIMITER = ", ";
+    private static final NumberFormat DEFAULT_FORMATTER = new DecimalFormat("0.000");
 
     protected int length;
 
@@ -59,9 +64,7 @@ public abstract class AbstractVector implements Vector {
 
     @Override
     public void assign(double value) {
-        for (int i = 0; i < length; i++) {
-            set(i, value);
-        }
+        update(Vectors.asConstFunction(value));
     }
 
     @Override
@@ -136,10 +139,10 @@ public abstract class AbstractVector implements Vector {
     @Override
     public Vector hadamardProduct(Vector vector, Factory factory) {
         ensureFactoryIsNotNull(factory);
-        ensureArgumentIsNotNull(vector,  "vectro");
+        ensureArgumentIsNotNull(vector,  "vector");
 
         if (length != vector.length()) {
-            fail("Wring vector length: " + vector.length() + ". Should be: " + length + ".");
+            fail("Wrong vector length: " + vector.length() + ". Should be: " + length + ".");
         }
 
         Vector result = blank(factory);
@@ -227,12 +230,12 @@ public abstract class AbstractVector implements Vector {
 
     @Override
     public double product() {
-        return fold(Vectors.asProductAccumulator(1));
+        return fold(Vectors.asProductAccumulator(1.0));
     }
 
     @Override
     public double sum() {
-        return fold(Vectors.asSumAccumulator(0));
+        return fold(Vectors.asSumAccumulator(0.0));
     }
 
     @Override
@@ -271,26 +274,6 @@ public abstract class AbstractVector implements Vector {
         }
 
         return result;
-    }
-
-    @Override
-    public double norm() {
-        return norm(Vectors.EUCLIDEAN_NORM);
-    }
-
-    @Override
-    public double norm(Vectors.NormFunction function) {
-        return function.compute(this);
-    }
-
-    @Override
-    public Vector normalize() {
-        return normalize(factory);
-    }
-
-    @Override
-    public Vector normalize(Factory factory) {
-        return divide(norm(), factory);
     }
 
     @Override
@@ -389,7 +372,10 @@ public abstract class AbstractVector implements Vector {
     public Vector slice(int from, int until, Factory factory) {
         ensureFactoryIsNotNull(factory);
 
-        // TODO: add range checks
+        if (until - from < 0) {
+            fail("Wrong slice range: [" + from + ".." + until + "].");
+        }
+
         Vector result = factory.createVector(until - from);
 
         for (int i = from; i < until; i++) {
@@ -409,10 +395,11 @@ public abstract class AbstractVector implements Vector {
         int newLength = indices.length;
 
         if (newLength == 0) {
-            fail("Now elements selected.");
+            fail("No elements selected.");
         }
 
         Vector result = factory.createVector(newLength);
+
         for (int i = 0; i < newLength; i++) {
             result.set(i, get(indices[i]));
         }
@@ -433,42 +420,13 @@ public abstract class AbstractVector implements Vector {
     }
 
     @Override
-    public void eachNonZero(VectorProcedure procedure) {
-        for (int i = 0; i < length; i++) {
-            if (Math.abs(get(i)) > Vectors.EPS) {
-                procedure.apply(i, get(i));
-            }
-        }
-    }
-
-    @Override
     public double max() {
-
-        double max = Double.NEGATIVE_INFINITY;
-
-        for (int i = 0; i < length; i++) {
-            double value = get(i);
-            if (value > max) {
-                max = value;
-            }
-        }
-
-        return max;
+        return fold(Vectors.mkMaxAccumulator());
     }
 
     @Override
     public double min() {
-
-        double min = Double.POSITIVE_INFINITY;
-
-        for (int i = 0; i < length; i++) {
-            double value = get(i);
-            if (value < min) {
-                min = value;
-            }
-        }
-
-        return min;
+        return fold(Vectors.mkMinAccumulator());
     }
 
     @Override
@@ -539,11 +497,6 @@ public abstract class AbstractVector implements Vector {
     @Override
     public boolean non(VectorPredicate predicate) {
         return !is(predicate);
-    }
-
-    @Override
-    public Vector unsafe() {
-        return this;
     }
 
     @Override
@@ -619,14 +572,26 @@ public abstract class AbstractVector implements Vector {
 
     @Override
     public String toString() {
+        return mkString(DEFAULT_FORMATTER,
+                        DEFAULT_DELIMITER);
+    }
+
+    @Override
+    public String mkString(NumberFormat formatter) {
+        return mkString(formatter,
+                        DEFAULT_DELIMITER);
+    }
+
+    @Override
+    public String mkString(NumberFormat formatter, String delimiter) {
+
         StringBuilder sb = new StringBuilder();
 
-        sb.append("[");
         for (int i = 0; i < length; i++) {
-            sb.append(String.format("%6.3f", get(i)));
-            sb.append((i < length - 1 ? ", " : " "));
+
+            sb.append(formatter.format(get(i)));
+            sb.append((i < length - 1 ? delimiter : ""));
         }
-        sb.append("]");
 
         return sb.toString();
     }

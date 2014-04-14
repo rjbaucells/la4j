@@ -28,10 +28,10 @@ public class RandomMatrixSource implements MatrixSource {
     private int rows, columns;
     private Random random;
 
-    public RandomMatrixSource(int rows, int columns) {
+    public RandomMatrixSource(int rows, int columns, Random random) {
         this.rows = rows;
         this.columns = columns;
-        this.random = new Random();
+        this.random = random;
     }
 
     @Override

@@ -1,6 +1,19 @@
 Changelog
 ---------
-la4j-0.5.0 `Jan 2014`
+la4j-0.5.0 `Apr 2014`
+ * Bug fix in serialization algorithm of sparse matrices (contributed by Catherine da Graca)`
+ * New sparse matrix methods: `foldNonZero()`, `foldNonZeroInRow()`, `foldNonZeroInColumn()`, `foldNonZeroInColumns()`, `foldNonZeroInRows()`
+ * New sparse vector method: `foldNonZero()`
+ * New entity: `MatrixBuilder`
+ * New entity: `VectorBuilder`
+ * New matrix/vector method `mkString()` for customized to-string conversion
+ * Bug fix in random generation of sparse matrices
+ * New sparse methods: `isZeroAt()` and `nonZeroAt()`
+ * Method `eachNonZero` is available only for sparse entities
+ * New sparse method: `getOrElse()`
+ * Bug fix in `resize()` method of sparse vector (reported by Leonid Ilyevsky)
+
+la4j-0.4.9 `Jan 2014`
  * Bug fix in `align()` method for big sparse matrices (reported by Michael Kapper)
  * Bug fix in `growup()` method for big sparse matrices (contributed by Phil Messenger)
  * Bug fix in `MatrixMarketStream`
@@ -11,6 +24,11 @@ la4j-0.5.0 `Jan 2014`
  * New matrix predicate `Matrices.INVERTIBLE_MATRIX` (contributed by Miron Aseev)
  * New vector method `norm(NormFunction)` that implements p-norm support (contributed by Miron Aseev)
  * New matrix predicate `PositiveDefiniteMatrix` (contributed by Miron Aseev)
+ * Bug fix in `each`, `eachInRow`, `eachInColumn` methods of sparse matrices (reported by Leonid Ilyevsky)
+ * New matrix methods: `foldColumns` and `foldRows` (contributed by Todd Brunhoff)
+ * New matrix methods: `assignRow` and `assignColumn`
+ * New matrix methods: `updateRow` and `updateColumn`
+ * New matrix methods: `transformRow` and `transformColumn`
 
 la4j-0.4.5 `Sep 2013`
  * New vector methods: `innerProduct()`, `outerProduct()` (contributed by Daniel Renshaw)

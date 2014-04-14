@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013, by Vladimir Kostyukov and Contributors.
+ * Copyright 2011-2014, by Vladimir Kostyukov and Contributors.
  * 
  * This file is part of la4j project (http://la4j.org)
  * 
@@ -21,25 +21,33 @@
 
 package org.la4j.matrix.source;
 
+/**
+ * A matrix source abstraction that is primary used as a constructor
+ * parameter for matrices.gi
+ */
 public interface MatrixSource {
 
     /**
+     * Gets a specified element of this source.
      * 
-     * @param i
-     * @param j
-     * @return
+     * @param i the row index
+     * @param j the column index
+     *
+     * @return an element of this source
      */
     double get(int i, int j);
 
     /**
+     * Returns the number of columns in this source.
      * 
-     * @return
+     * @return a number of columns
      */
     int columns();
 
     /**
+     * Returns the number of rows in this source.
      * 
-     * @return
+     * @return a number of rows
      */
     int rows();
 }
